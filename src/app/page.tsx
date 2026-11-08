@@ -195,17 +195,45 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-start py-8 px-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <div className="w-full max-w-xl flex flex-col items-center text-center p-6 sm:p-8 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800">
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">HIVE</h1>
-        <p className="mt-4 text-base sm:text-lg text-zinc-600 dark:text-zinc-400">
+    <main className="min-h-screen w-full flex flex-col items-center justify-start py-8 sm:py-12 px-4 text-[#4A2C0A]">
+      <div className="w-full max-w-xl flex flex-col items-center text-center p-6 sm:p-8 bg-[#FFFBEB]/90 backdrop-blur-sm rounded-3xl shadow-xl shadow-amber-900/10 border border-[#F5B301]/40">
+        {/* 六角形4つのHIVEロゴ */}
+        <h1
+          aria-label="HIVE"
+          className="flex items-center justify-center -space-x-1 sm:-space-x-1.5 py-2 my-1 select-none"
+        >
+          {[
+            { char: "H", offset: "-translate-y-1.5 sm:-translate-y-2" },
+            { char: "I", offset: "translate-y-1.5 sm:translate-y-2" },
+            { char: "V", offset: "-translate-y-1.5 sm:-translate-y-2" },
+            { char: "E", offset: "translate-y-1.5 sm:translate-y-2" },
+          ].map(({ char, offset }) => (
+            <div
+              key={char}
+              className={`relative flex items-center justify-center w-12 h-14 sm:w-16 sm:h-18 transition-transform ${offset} filter drop-shadow-sm`}
+            >
+              <div
+                className="absolute inset-0 bg-[#F5B301]"
+                style={{
+                  clipPath:
+                    "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                }}
+              />
+              <span className="relative z-10 text-2xl sm:text-3xl font-black text-[#4A2C0A] tracking-wider">
+                {char}
+              </span>
+            </div>
+          ))}
+        </h1>
+
+        <p className="mt-4 text-base sm:text-lg font-medium text-[#4A2C0A]">
           その夢を実現させる仲間を見つけよう。
         </p>
 
         {error && (
           <div
             role="alert"
-            className="mt-6 w-full p-3 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-sm font-medium border border-red-200 dark:border-red-900/50 text-left"
+            className="mt-6 w-full p-3.5 rounded-xl bg-[#FFF1DC] text-[#7A2500] text-sm font-medium border border-[#F5B301] text-left shadow-sm"
           >
             {error}
           </div>
@@ -213,24 +241,24 @@ export default function Home() {
 
         <div className="mt-8 w-full flex flex-col items-center">
           {loading ? (
-            <div className="flex items-center gap-2 py-3 text-zinc-500 dark:text-zinc-400 font-medium">
+            <div className="flex items-center gap-2 py-3 text-[#4A2C0A]/70 font-medium">
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               <span>読み込み中...</span>
             </div>
           ) : user ? (
             <div className="w-full flex flex-col gap-6">
               {/* ユーザーヘッダー & ログアウト */}
-              <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-[#F5B301]/30">
                 <div className="text-left">
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 block">ログイン中</span>
-                  <span className="text-base font-semibold text-zinc-800 dark:text-zinc-200 break-all">
+                  <span className="text-xs text-[#4A2C0A]/70 font-medium block">ログイン中</span>
+                  <span className="text-base font-bold text-[#4A2C0A] break-all">
                     {user.displayName || user.email || "ユーザー"}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full sm:w-auto px-4 py-2 rounded-full border border-zinc-300 dark:border-zinc-700 bg-transparent text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 rounded-full border border-[#F5B301] bg-[#FFF8E1] text-[#4A2C0A] text-sm font-semibold hover:bg-[#F5B301] transition-colors shadow-sm"
                 >
                   ログアウト
                 </button>
@@ -238,13 +266,13 @@ export default function Home() {
 
               {/* スキル登録フォーム */}
               {profileLoading ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-zinc-500 dark:text-zinc-400 font-medium">
+                <div className="flex items-center justify-center gap-2 py-8 text-[#4A2C0A]/70 font-medium">
                   <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   <span>読み込み中...</span>
                 </div>
               ) : (
                 <form onSubmit={handleSaveProfile} className="w-full flex flex-col gap-4 text-left">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <h2 className="text-xl font-bold text-[#4A2C0A] border-b border-[#F5B301]/30 pb-2">
                     スキル登録
                   </h2>
 
@@ -252,7 +280,7 @@ export default function Home() {
                   {profileError && (
                     <div
                       role="alert"
-                      className="w-full p-3 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-sm font-medium border border-red-200 dark:border-red-900/50"
+                      className="w-full p-3.5 rounded-xl bg-[#FFF1DC] text-[#7A2500] text-sm font-medium border border-[#F5B301] shadow-sm"
                     >
                       エラー: {profileError}
                     </div>
@@ -261,7 +289,7 @@ export default function Home() {
                   {profileSuccess && (
                     <div
                       role="status"
-                      className="w-full p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-sm font-medium border border-emerald-200 dark:border-emerald-900/50"
+                      className="w-full p-3.5 rounded-xl bg-[#FFF8E1] text-[#4A2C0A] text-sm font-semibold border border-[#F5B301] shadow-sm"
                     >
                       {profileSuccess}
                     </div>
@@ -269,8 +297,8 @@ export default function Home() {
 
                   {/* 表示名 */}
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="displayName" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      表示名 <span className="text-red-500">*</span>
+                    <label htmlFor="displayName" className="text-sm font-bold text-[#4A2C0A]">
+                      表示名 <span className="text-[#C2410C]">*</span>
                     </label>
                     <input
                       id="displayName"
@@ -281,14 +309,14 @@ export default function Home() {
                       value={formData.displayName}
                       onChange={handleChange}
                       placeholder="例: 山田 太郎"
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner"
                     />
                   </div>
 
                   {/* 大学名 */}
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="university" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      大学名 <span className="text-red-500">*</span>
+                    <label htmlFor="university" className="text-sm font-bold text-[#4A2C0A]">
+                      大学名 <span className="text-[#C2410C]">*</span>
                     </label>
                     <input
                       id="university"
@@ -299,15 +327,15 @@ export default function Home() {
                       value={formData.university}
                       onChange={handleChange}
                       placeholder="例: ○○大学"
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner"
                     />
                   </div>
 
                   {/* 学部 & 学科 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label htmlFor="faculty" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                        学部 <span className="text-red-500">*</span>
+                      <label htmlFor="faculty" className="text-sm font-bold text-[#4A2C0A]">
+                        学部 <span className="text-[#C2410C]">*</span>
                       </label>
                       <input
                         id="faculty"
@@ -318,12 +346,12 @@ export default function Home() {
                         value={formData.faculty}
                         onChange={handleChange}
                         placeholder="例: 工学部"
-                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner"
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label htmlFor="department" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                        学科 <span className="text-red-500">*</span>
+                      <label htmlFor="department" className="text-sm font-bold text-[#4A2C0A]">
+                        学科 <span className="text-[#C2410C]">*</span>
                       </label>
                       <input
                         id="department"
@@ -334,15 +362,15 @@ export default function Home() {
                         value={formData.department}
                         onChange={handleChange}
                         placeholder="例: 情報工学科"
-                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner"
                       />
                     </div>
                   </div>
 
                   {/* 専攻・分野 */}
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="major" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      専攻・分野 <span className="text-red-500">*</span>
+                    <label htmlFor="major" className="text-sm font-bold text-[#4A2C0A]">
+                      専攻・分野 <span className="text-[#C2410C]">*</span>
                     </label>
                     <input
                       id="major"
@@ -353,14 +381,14 @@ export default function Home() {
                       value={formData.major}
                       onChange={handleChange}
                       placeholder="例: 人工知能・自然言語処理"
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner"
                     />
                   </div>
 
                   {/* できること */}
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="skills" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      できること <span className="text-red-500">*</span>
+                    <label htmlFor="skills" className="text-sm font-bold text-[#4A2C0A]">
+                      できること <span className="text-[#C2410C]">*</span>
                     </label>
                     <textarea
                       id="skills"
@@ -371,13 +399,13 @@ export default function Home() {
                       value={formData.skills}
                       onChange={handleChange}
                       placeholder="例: TypeScript / Reactを用いたWebフロントエンド開発、Pythonでのデータ分析、UI/UXデザインなど"
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-y"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner resize-y"
                     />
                   </div>
 
                   {/* 協力したいテーマや動機（任意） */}
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="motivation" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                    <label htmlFor="motivation" className="text-sm font-bold text-[#4A2C0A]">
                       協力したいテーマや動機（任意）
                     </label>
                     <textarea
@@ -388,7 +416,7 @@ export default function Home() {
                       value={formData.motivation}
                       onChange={handleChange}
                       placeholder="例: 教育系のWebサービスやハッカソンでのプロダクト開発に参加したいです。"
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-y"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#F5B301]/60 bg-[#FFFDF5]/90 text-[#4A2C0A] placeholder-[#4A2C0A]/40 text-sm focus:outline-none focus:border-[#F5B301] focus:ring-2 focus:ring-[#F5B301]/50 shadow-inner resize-y"
                     />
                   </div>
 
@@ -397,7 +425,7 @@ export default function Home() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full sm:w-auto min-w-[140px] px-6 py-2.5 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm font-semibold shadow hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto min-w-[140px] px-6 py-2.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                     >
                       {saving ? (
                         <>
@@ -416,9 +444,9 @@ export default function Home() {
             <button
               type="button"
               onClick={handleLogin}
-              className="w-full sm:w-auto min-w-[220px] flex items-center justify-center gap-3 px-6 py-3 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm sm:text-base font-semibold shadow hover:opacity-90 transition-opacity"
+              className="w-full sm:w-auto min-w-[220px] flex items-center justify-center gap-3 px-6 py-3 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm sm:text-base font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] transition-all"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="#4285F4"
                   d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
