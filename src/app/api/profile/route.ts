@@ -130,8 +130,8 @@ export async function PUT(request: Request) {
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // ドキュメントIDには検証済みトークンのuidのみを使用
-    await db.collection("users").doc(authUser.uid).set(profileData);
+    // ドキュメントIDには検証済みトークンのuidのみを使用（geminiUsage等の他フィールドを保護するためmergeを有効化）
+    await db.collection("users").doc(authUser.uid).set(profileData, { merge: true });
 
     return NextResponse.json({ message: "プロフィールを保存しました。" });
   } catch (error) {
