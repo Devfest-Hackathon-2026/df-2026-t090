@@ -362,287 +362,290 @@ export default function Home() {
 
           {/* ──────────────── W01 ホーム（合うプロジェクト一覧） ──────────────── */}
           {activeNav === "home" && (
-            <div className="flex flex-col gap-6">
-              {/* プロジェクト詳細モーダル */}
-              {selectedIdea ? (
-                <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503] shadow-lg flex flex-col gap-6 text-left">
-                  <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedIdea(null)}
-                      className="text-xs font-bold text-[#B87503] hover:underline flex items-center gap-1"
-                    >
-                      ← 一覧に戻る
-                    </button>
-                    <span className="px-3 py-0.5 rounded-full bg-[#EDF7ED] text-[#1E4620] border border-[#81C784] text-xs font-bold">
-                      運営審査通過済（公募中）
-                    </span>
-                  </div>
+            <div
+              className="relative rounded-3xl overflow-hidden border border-[#B87503]/30 shadow-md p-4 sm:p-6 md:p-8 bg-cover bg-center transition-all"
+              style={{ backgroundImage: "url('/project-list-bg.jpeg')" }}
+            >
+              {/* 背景画像の質感を活かしつつコントラストと可読性を保つオーバーレイ */}
+              <div className="absolute inset-0 bg-[#FFFDF7]/85 backdrop-blur-[1.5px]" />
 
-                  <div>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {selectedIdea.fields.map((f) => (
-                        <span
-                          key={f}
-                          className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301]"
-                        >
-                          {f}
-                        </span>
-                      ))}
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-black text-[#3D2406]">
-                      {selectedIdea.title}
-                    </h2>
-                    <p className="text-xs text-[#7A5726] mt-1">
-                      提唱者: <span className="font-bold text-[#3D2406]">{selectedIdea.author.displayName}</span>
-                      {selectedIdea.author.university && ` (${selectedIdea.author.university} ${selectedIdea.author.faculty || ""})`}
-                    </p>
-                  </div>
-
-                  {/* 在籍校だけでは実現できない理由（仕様書重要項目） */}
-                  <div className="p-4 rounded-2xl bg-[#FFF4CA] border border-[#F5B301] flex flex-col gap-1">
-                    <span className="text-xs font-black text-[#B87503] flex items-center gap-1">
-                      <span>🏫</span>
-                      <span>在籍校だけでは実現できない理由</span>
-                    </span>
-                    <p className="text-xs sm:text-sm text-[#3D2406] leading-relaxed">
-                      自大学内の専門分野だけでは不足しており、他大学の工学・デザイン・農学など異なる専門スキルを持つ仲間が集まることで初めて実現できるプロジェクトです。
-                    </p>
-                  </div>
-
-                  {/* 目的・ゴール */}
-                  <div className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/25 flex flex-col gap-1">
-                    <span className="text-xs font-bold text-[#7A5726]">プロジェクトのゴール</span>
-                    <p className="text-xs sm:text-sm text-[#3D2406] leading-relaxed">
-                      {selectedIdea.goal}
-                    </p>
-                  </div>
-
-                  {/* 募集ロール */}
-                  <div className="flex flex-col gap-2">
-                    <span className="text-xs font-bold text-[#7A5726]">募集している役割（ロール）</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {selectedIdea.roles.map((r, i) => (
-                        <div
-                          key={i}
-                          className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-1.5"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-xs text-[#3D2406]">{r.name}</span>
-                            <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503]">
-                              親和度 88%
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-[#5C3D15]">{r.reason}</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {r.skills.map((s, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#FFF8E1] text-[#3D2406]"
-                              >
-                                {s}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* AIマッチング候補 */}
-                  <div className="p-5 rounded-2xl bg-[#FFFDF7] border border-[#F5B301] flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-[#B87503] flex items-center gap-1.5">
-                        <span>🤝</span>
-                        <span>足りない役割に合う学生の提案（AIマッチング）</span>
-                      </span>
+              <div className="relative z-10 flex flex-col gap-6">
+                {/* プロジェクト詳細モーダル */}
+                {selectedIdea ? (
+                  <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503] shadow-lg flex flex-col gap-6 text-left">
+                    <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-3">
                       <button
                         type="button"
-                        onClick={() => handleMatchStudents(selectedIdea.id)}
-                        disabled={matchingLoading}
-                        className="px-3 py-1 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] disabled:opacity-50"
+                        onClick={() => setSelectedIdea(null)}
+                        className="text-xs font-bold text-[#B87503] hover:underline flex items-center gap-1"
                       >
-                        {matchingLoading ? "分析中..." : "AI再マッチング"}
+                        ← 一覧に戻る
                       </button>
+                      <span className="px-3 py-0.5 rounded-full bg-[#EDF7ED] text-[#1E4620] border border-[#81C784] text-xs font-bold">
+                        運営審査通過済（公募中）
+                      </span>
                     </div>
 
-                    {matchingMessage && (
-                      <div className="p-2.5 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs font-bold">
-                        ✓ {matchingMessage}
+                    <div>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedIdea.fields.map((f) => (
+                          <span
+                            key={f}
+                            className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301]"
+                          >
+                            {f}
+                          </span>
+                        ))}
                       </div>
-                    )}
-                    {matchingError && (
-                      <div className="p-2.5 rounded-xl bg-[#FDEAEA] border border-[#E57373] text-[#5F1313] text-xs font-bold">
-                        ⚠ {matchingError}
-                      </div>
-                    )}
+                      <h2 className="text-xl sm:text-2xl font-black text-[#3D2406]">
+                        {selectedIdea.title}
+                      </h2>
+                      <p className="text-xs text-[#7A5726] mt-1">
+                        提唱者: <span className="font-bold text-[#3D2406]">{selectedIdea.author.displayName}</span>
+                        {selectedIdea.author.university && ` (${selectedIdea.author.university} ${selectedIdea.author.faculty || ""})`}
+                      </p>
+                    </div>
 
-                    {selectedIdea.aiSuggestions && selectedIdea.aiSuggestions.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                        {selectedIdea.aiSuggestions.map((sugg, i) => (
+                    {/* 在籍校だけでは実現できない理由（仕様書重要項目） */}
+                    <div className="p-4 rounded-2xl bg-[#FFF4CA] border border-[#F5B301] flex flex-col gap-1">
+                      <span className="text-xs font-black text-[#B87503] flex items-center gap-1">
+                        <span>🏫</span>
+                        <span>在籍校だけでは実現できない理由</span>
+                      </span>
+                      <p className="text-xs sm:text-sm text-[#3D2406] leading-relaxed">
+                        自大学内の専門分野だけでは不足しており、他大学の工学・デザイン・農学など異なる専門スキルを持つ仲間が集まることで初めて実現できるプロジェクトです。
+                      </p>
+                    </div>
+
+                    {/* 目的・ゴール */}
+                    <div className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/25 flex flex-col gap-1">
+                      <span className="text-xs font-bold text-[#7A5726]">プロジェクトのゴール</span>
+                      <p className="text-xs sm:text-sm text-[#3D2406] leading-relaxed">
+                        {selectedIdea.goal}
+                      </p>
+                    </div>
+
+                    {/* 募集ロール */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-bold text-[#7A5726]">募集している役割（ロール）</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectedIdea.roles.map((r, i) => (
                           <div
                             key={i}
-                            className="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-1.5"
+                            className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-1.5"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-[#3D2406]">
-                                候補: {sugg.displayName}
-                              </span>
-                              <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301]">
-                                {sugg.matchedRole}
+                              <span className="font-bold text-xs text-[#3D2406]">{r.name}</span>
+                              <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503]">
+                                親和度 88%
                               </span>
                             </div>
-                            <span className="text-[11px] text-[#7A5726]">
-                              {sugg.university} {sugg.faculty}
-                            </span>
-                            <p className="text-[11px] text-[#5C3D15] leading-relaxed">
-                              推薦理由: {sugg.reason}
-                            </p>
+                            <p className="text-[11px] text-[#5C3D15]">{r.reason}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {r.skills.map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#FFF8E1] text-[#3D2406]"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-xs text-[#7A5726]">
-                        まだ候補は保存されていません。「AI再マッチング」ボタンを押すと、登録学生の中から適任者を抽出します。
-                      </p>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="flex justify-end pt-3 border-t border-[#B87503]/20">
-                    <button
-                      type="button"
-                      onClick={() => alert("このロールへの応募を送信しました（提唱者に通知されます）。")}
-                      className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs sm:text-sm font-bold shadow-md hover:bg-[#E0A200]"
-                    >
-                      このプロジェクトに応募する 🚀
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* 分野フィルター */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#7A5726]">分野で絞り込む:</span>
+                    {/* AIマッチング候補 */}
+                    <div className="p-5 rounded-2xl bg-[#FFFDF7] border border-[#F5B301] flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-[#B87503] flex items-center gap-1.5">
+                          <span>🤝</span>
+                          <span>足りない役割に合う学生の提案（AIマッチング）</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleMatchStudents(selectedIdea.id)}
+                          disabled={matchingLoading}
+                          className="px-3 py-1 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] disabled:opacity-50"
+                        >
+                          {matchingLoading ? "分析中..." : "AI再マッチング"}
+                        </button>
+                      </div>
+
+                      {matchingMessage && (
+                        <div className="p-2.5 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs font-bold">
+                          ✓ {matchingMessage}
+                        </div>
+                      )}
+                      {matchingError && (
+                        <div className="p-2.5 rounded-xl bg-[#FDEAEA] border border-[#E57373] text-[#5F1313] text-xs font-bold">
+                          ⚠ {matchingError}
+                        </div>
+                      )}
+
+                      {selectedIdea.aiSuggestions && selectedIdea.aiSuggestions.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                          {selectedIdea.aiSuggestions.map((sugg, i) => (
+                            <div
+                              key={i}
+                              className="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-1.5"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-[#3D2406]">
+                                  候補: {sugg.displayName}
+                                </span>
+                                <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301]">
+                                  {sugg.matchedRole}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-[#7A5726]">
+                                {sugg.university} {sugg.faculty}
+                              </span>
+                              <p className="text-[11px] text-[#5C3D15] leading-relaxed">
+                                推薦理由: {sugg.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#7A5726]">
+                          まだ候補は保存されていません。「AI再マッチング」ボタンを押すと、登録学生の中から適任者を抽出します。
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end pt-3 border-t border-[#B87503]/20">
                       <button
                         type="button"
-                        onClick={() => {
-                          setIdeasLoading(true);
-                          fetchPublishedIdeas(selectedField);
-                        }}
-                        className="text-xs text-[#B87503] hover:underline font-bold"
+                        onClick={() => alert("このロールへの応募を送信しました（提唱者に通知されます）。")}
+                        className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs sm:text-sm font-bold shadow-md hover:bg-[#E0A200]"
                       >
-                        🔄 最新に更新
+                        このプロジェクトに応募する 🚀
                       </button>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {FILTER_FIELDS.map((field) => (
+                  </div>
+                ) : (
+                  <>
+                    {/* 分野フィルター */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#3D2406]">分野で絞り込む:</span>
                         <button
-                          key={field}
                           type="button"
                           onClick={() => {
                             setIdeasLoading(true);
-                            setSelectedField(field);
+                            fetchPublishedIdeas(selectedField);
                           }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            selectedField === field
-                              ? "bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]"
-                              : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1] border border-[#B87503]/25"
-                          }`}
+                          className="text-xs text-[#B87503] hover:underline font-bold"
                         >
-                          {field}
+                          🔄 最新に更新
                         </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {ideasError && (
-                    <div className="p-3 rounded-xl bg-[#FDEAEA] border border-[#E57373] text-[#5F1313] text-xs font-bold">
-                      ⚠ {ideasError}
-                    </div>
-                  )}
-
-                  <p className="text-[11px] text-[#7A5726]">
-                    ※ 親和度は、プロジェクトのロールが求めるスキルとあなたのスキルツリーの重なりから仮の計算方法（重み加重平均）で算出しています。
-                  </p>
-
-                  {/* カード一覧 */}
-                  {ideasLoading ? (
-                    <div className="py-16 text-center text-[#7A5726] font-bold flex items-center justify-center gap-2">
-                      <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#F5B301] border-t-transparent" />
-                      <span>プロジェクトを読み込み中...</span>
-                    </div>
-                  ) : publishedIdeas.length === 0 ? (
-                    <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center">
-                      <p className="text-sm font-bold text-[#3D2406]">
-                        該当するプロジェクトはありませんでした。
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {publishedIdeas.map((idea, idx) => {
-                        const demoAffinity = 92 - (idx % 4) * 8; // デモ親和度 (92%, 84%, 76%, 68%)
-                        return (
-                          <div
-                            key={idea.id}
-                            className="p-5 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between gap-4 text-left"
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {FILTER_FIELDS.map((field) => (
+                          <button
+                            key={field}
+                            type="button"
+                            onClick={() => {
+                              setIdeasLoading(true);
+                              setSelectedField(field);
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                              selectedField === field
+                                ? "bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]"
+                                : "bg-[#FFFBEB]/90 text-[#5C3D15] hover:bg-[#FFF8E1] border border-[#B87503]/25"
+                            }`}
                           >
-                            <div className="flex flex-col gap-2">
-                              {/* カードヘッダー: 参加形態、学校数、親和度 */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EDF7ED] text-[#1E4620] border border-[#81C784]">
-                                    公募可
-                                  </span>
-                                  <span className="text-[11px] text-[#7A5726] font-medium">
-                                    3校から参加中
-                                  </span>
-                                </div>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#F5B301] text-[#3D2406] shadow-xs">
-                  親和度 {demoAffinity}%
-                                </span>
-                              </div>
+                            {field}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                              <h3 className="text-base font-bold text-[#3D2406] line-clamp-2">
-                                {idea.title}
-                              </h3>
+                    {ideasError && (
+                      <div className="p-3 rounded-xl bg-[#FDEAEA] border border-[#E57373] text-[#5F1313] text-xs font-bold">
+                        ⚠ {ideasError}
+                      </div>
+                    )}
 
-                              <div className="flex flex-wrap gap-1">
-                                {idea.fields.map((f) => (
-                                  <span
-                                    key={f}
-                                    className="px-2 py-0.2 rounded-md text-[10px] font-bold bg-[#FFF8E1] text-[#5C3D15] border border-[#B87503]/20"
-                                  >
-                                    {f}
-                                  </span>
-                                ))}
-                              </div>
+                    <p className="text-[11px] text-[#5C3D15]">
+                      ※ 親和度は、プロジェクトのロールが求めるスキルとあなたのスキルツリーの重なりから仮の計算方法（重み加重平均）で算出しています。
+                    </p>
 
-                              <p className="text-xs text-[#5C3D15] line-clamp-2 mt-1">
-                                {idea.goal}
-                              </p>
-                            </div>
+                    {/* 六角形（ハニカム）互い違いプロジェクト一覧 */}
+                    {ideasLoading ? (
+                      <div className="py-20 text-center text-[#7A5726] font-bold flex items-center justify-center gap-2">
+                        <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#F5B301] border-t-transparent" />
+                        <span>プロジェクトを読み込み中...</span>
+                      </div>
+                    ) : publishedIdeas.length === 0 ? (
+                      <div className="p-8 rounded-3xl bg-[#FFFBEB]/90 border border-[#B87503]/30 text-center">
+                        <p className="text-sm font-bold text-[#3D2406]">
+                          該当するプロジェクトはありませんでした。
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-2 sm:gap-x-5 gap-y-4 sm:gap-y-6 justify-items-center pt-3 pb-12">
+                        {publishedIdeas.map((idea, idx) => {
+                          const demoAffinity = 92 - (idx % 4) * 8;
+                          // 蜂の巣のように互い違いに並べる（偶数列・奇数番目を下にずらす）
+                          const isShifted = idx % 2 === 1;
 
-                            {/* フッター: 提唱者 ＆ 詳細ボタン */}
-                            <div className="pt-3 border-t border-[#B87503]/20 flex items-center justify-between">
-                              <span className="text-[11px] text-[#7A5726]">
-                                提唱: <strong className="text-[#3D2406]">{idea.author.displayName}</strong>
-                              </span>
+                          return (
+                            <div
+                              key={idea.id}
+                              className={`w-full flex justify-center transition-all ${
+                                isShifted ? "translate-y-4 sm:translate-y-7" : ""
+                              }`}
+                            >
+                              {/* CSSのみで作成した六角形の枠（画像不使用） */}
                               <button
                                 type="button"
                                 onClick={() => setSelectedIdea(idea)}
-                                className="px-3.5 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs"
+                                className="group relative flex items-center justify-center transition-transform hover:scale-105 active:scale-95 focus:outline-none w-[142px] h-[164px] sm:w-[184px] sm:h-[212px] drop-shadow-sm hover:drop-shadow-md cursor-pointer"
                               >
-                                詳しく見る
+                                {/* 外側六角形（はちみつ琥珀ボーダー） */}
+                                <div
+                                  className="absolute inset-0 bg-gradient-to-b from-[#F5B301] to-[#B87503] group-hover:from-[#E0A200] group-hover:to-[#8C4600] transition-colors"
+                                  style={{
+                                    clipPath:
+                                      "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                                  }}
+                                />
+
+                                {/* 内側六角形カード（背景色、ボーダー幅分インセット） */}
+                                <div
+                                  className="absolute inset-[2.5px] sm:inset-[3px] bg-[#FFFBEB]/95 group-hover:bg-[#FFF8E1] transition-colors flex flex-col items-center justify-center px-2.5 py-4 sm:px-4 sm:py-6 text-center gap-1 sm:gap-1.5 overflow-hidden"
+                                  style={{
+                                    clipPath:
+                                      "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                                  }}
+                                >
+                                  {/* 分野バッジ（枠からはみ出さないようtruncate） */}
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301] truncate max-w-[95px] sm:max-w-[125px]">
+                                    {idea.fields[0] || "プロジェクト"}
+                                  </span>
+
+                                  {/* タイトル（枠からはみ出さないようline-clamp-2） */}
+                                  <h3 className="text-[11px] sm:text-xs font-black text-[#3D2406] line-clamp-2 leading-snug break-words px-1 max-w-[110px] sm:max-w-[145px]">
+                                    {idea.title}
+                                  </h3>
+
+                                  {/* 親和度・詳細案内 */}
+                                  <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-[#7A5726] font-bold mt-0.5">
+                                    <span className="text-[#B87503]">親和度 {demoAffinity}%</span>
+                                  </div>
+                                </div>
                               </button>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
