@@ -573,7 +573,7 @@ export default function Home() {
                       ※ 親和度は、プロジェクトのロールが求めるスキルとあなたのスキルツリーの重なりから仮の計算方法（重み加重平均）で算出しています。
                     </p>
 
-                    {/* 六角形（ハニカム）互い違いプロジェクト一覧 */}
+                    {/* プロジェクトカード一覧（四角いカードで中身を読みやすく表示） */}
                     {ideasLoading ? (
                       <div className="py-20 text-center text-[#7A5726] font-bold flex items-center justify-center gap-2">
                         <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#F5B301] border-t-transparent" />
@@ -586,58 +586,63 @@ export default function Home() {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-2 sm:gap-x-5 gap-y-4 sm:gap-y-6 justify-items-center pt-3 pb-12">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {publishedIdeas.map((idea, idx) => {
-                          const demoAffinity = 92 - (idx % 4) * 8;
-                          // 蜂の巣のように互い違いに並べる（偶数列・奇数番目を下にずらす）
-                          const isShifted = idx % 2 === 1;
-
+                          const demoAffinity = 92 - (idx % 4) * 8; // デモ親和度 (92%, 84%, 76%, 68%)
                           return (
                             <div
                               key={idea.id}
-                              className={`w-full flex justify-center transition-all ${
-                                isShifted ? "translate-y-4 sm:translate-y-7" : ""
-                              }`}
+                              className="p-5 rounded-3xl bg-[#FFFBEB]/95 backdrop-blur-xs border border-[#B87503]/30 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-4 text-left"
                             >
-                              {/* CSSのみで作成した六角形の枠（画像不使用） */}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedIdea(idea)}
-                                className="group relative flex items-center justify-center transition-transform hover:scale-105 active:scale-95 focus:outline-none w-[142px] h-[164px] sm:w-[184px] sm:h-[212px] drop-shadow-sm hover:drop-shadow-md cursor-pointer"
-                              >
-                                {/* 外側六角形（はちみつ琥珀ボーダー） */}
-                                <div
-                                  className="absolute inset-0 bg-gradient-to-b from-[#F5B301] to-[#B87503] group-hover:from-[#E0A200] group-hover:to-[#8C4600] transition-colors"
-                                  style={{
-                                    clipPath:
-                                      "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                                  }}
-                                />
-
-                                {/* 内側六角形カード（背景色、ボーダー幅分インセット） */}
-                                <div
-                                  className="absolute inset-[2.5px] sm:inset-[3px] bg-[#FFFBEB]/95 group-hover:bg-[#FFF8E1] transition-colors flex flex-col items-center justify-center px-2.5 py-4 sm:px-4 sm:py-6 text-center gap-1 sm:gap-1.5 overflow-hidden"
-                                  style={{
-                                    clipPath:
-                                      "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                                  }}
-                                >
-                                  {/* 分野バッジ（枠からはみ出さないようtruncate） */}
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-[#F5B301]/25 text-[#3D2406] border border-[#F5B301] truncate max-w-[95px] sm:max-w-[125px]">
-                                    {idea.fields[0] || "プロジェクト"}
-                                  </span>
-
-                                  {/* タイトル（枠からはみ出さないようline-clamp-2） */}
-                                  <h3 className="text-[11px] sm:text-xs font-black text-[#3D2406] line-clamp-2 leading-snug break-words px-1 max-w-[110px] sm:max-w-[145px]">
-                                    {idea.title}
-                                  </h3>
-
-                                  {/* 親和度・詳細案内 */}
-                                  <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-[#7A5726] font-bold mt-0.5">
-                                    <span className="text-[#B87503]">親和度 {demoAffinity}%</span>
+                              <div className="flex flex-col gap-2">
+                                {/* カードヘッダー: 参加形態、学校数、親和度 */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EDF7ED] text-[#1E4620] border border-[#81C784]">
+                                      公募可
+                                    </span>
+                                    <span className="text-[11px] text-[#7A5726] font-medium">
+                                      3校から参加中
+                                    </span>
                                   </div>
+                                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#F5B301] text-[#3D2406] shadow-xs">
+                                    親和度 {demoAffinity}%
+                                  </span>
                                 </div>
-                              </button>
+
+                                <h3 className="text-base font-bold text-[#3D2406] line-clamp-2">
+                                  {idea.title}
+                                </h3>
+
+                                <div className="flex flex-wrap gap-1">
+                                  {idea.fields.map((f) => (
+                                    <span
+                                      key={f}
+                                      className="px-2 py-0.2 rounded-md text-[10px] font-bold bg-[#FFF8E1] text-[#5C3D15] border border-[#B87503]/20"
+                                    >
+                                      {f}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <p className="text-xs text-[#5C3D15] line-clamp-2 mt-1">
+                                  {idea.goal}
+                                </p>
+                              </div>
+
+                              {/* フッター: 提唱者 ＆ 詳細ボタン */}
+                              <div className="pt-3 border-t border-[#B87503]/20 flex items-center justify-between">
+                                <span className="text-[11px] text-[#7A5726]">
+                                  提唱: <strong className="text-[#3D2406]">{idea.author.displayName}</strong>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedIdea(idea)}
+                                  className="px-3.5 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs transition-colors"
+                                >
+                                  詳しく見る
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
