@@ -73,6 +73,7 @@ export async function GET(
       updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : null,
       publishedAt: data?.publishedAt?.toDate ? data.publishedAt.toDate().toISOString() : null,
       author,
+      aiSuggestions: Array.isArray(data?.aiSuggestions) ? data.aiSuggestions : [],
     });
   } catch (error) {
     console.error("アイデア取得エラー:", error);

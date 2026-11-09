@@ -47,6 +47,18 @@ interface AuthorInfo {
   major: string;
 }
 
+interface StudentSuggestion {
+  studentId: string;
+  displayName: string;
+  university: string;
+  faculty: string;
+  department: string;
+  major: string;
+  skills: string;
+  matchedRole: string;
+  reason: string;
+}
+
 interface PublishedIdea {
   id: string;
   ownerUid: string;
@@ -58,6 +70,7 @@ interface PublishedIdea {
   rawText: string;
   publishedAt: string | null;
   author: AuthorInfo;
+  aiSuggestions?: StudentSuggestion[];
 }
 
 type TabType = "ideas" | "idea" | "profile";
@@ -65,7 +78,7 @@ type IdeaStep = "input" | "questions" | "review" | "completed";
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // アクティブタブ（公開アイデア一覧 / アイデア投稿 / スキル登録）
@@ -73,10 +86,15 @@ export default function Home() {
 
   // 公開アイデア一覧用State
   const [publishedIdeas, setPublishedIdeas] = useState<PublishedIdea[]>([]);
-  const [ideasLoading, setIdeasLoading] = useState<boolean>(true);
+  const [ideasLoading, setIdeasLoading] = useState<boolean>(false);
   const [ideasError, setIdeasError] = useState<string | null>(null);
   const [selectedField, setSelectedField] = useState<FilterField>("すべて");
   const [selectedIdea, setSelectedIdea] = useState<PublishedIdea | null>(null);
+
+  // AI学生マッチング提案用State
+  const [matchingLoading, setMatchingLoading] = useState<boolean>(false);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
+  const [matchingMessage, setMatchingMessage] = useState<string | null>(null);
 
   // プロフィールフォーム用State
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
@@ -100,8 +118,6 @@ export default function Home() {
 
   // 公開アイデア一覧の取得
   const fetchPublishedIdeas = async (field?: string) => {
-    setIdeasLoading(true);
-    setIdeasError(null);
     try {
       const url =
         field && field !== "すべて"
@@ -115,6 +131,7 @@ export default function Home() {
       }
       const data = await res.json();
       setPublishedIdeas(data.ideas || []);
+      setIdeasError(null);
     } catch {
       setIdeasError("通信エラーが発生しました。");
     } finally {
@@ -123,7 +140,50 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchPublishedIdeas(selectedField);
+    let active = true;
+    const loadIdeas = async () => {
+      try {
+        const url =
+          selectedField && selectedField !== "すべて"
+            ? `/api/ideas?field=${encodeURIComponent(selectedField)}`
+            : "/api/ideas";
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (active) {
+            setIdeasError(err.error || "アイデア一覧の取得に失敗しました。");
+          }
+          return;
+        }
+        const data = await res.json();
+        if (active) {
+          setPublishedIdeas(data.ideas || []);
+          setIdeasError(null);
+        }
+      } catch {
+        if (active) {
+          setIdeasError("通信エラーが発生しました。");
+        }
+      } finally {
+        if (active) {
+          setIdeasLoading(false);
+        }
+      }
+    };
+
+    loadIdeas();
+
+    // フェイルセーフ: 万一通信が遅延しても最大3秒でローディングを必ず解除
+    const timer = setTimeout(() => {
+      if (active) {
+        setIdeasLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [selectedField]);
 
   // アイデア投稿用ハンドラー（初期化）
@@ -140,85 +200,116 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
+    let isMounted = true;
+    let unsubscribe: (() => void) | undefined;
 
-      if (currentUser) {
-        setProfileLoading(true);
-        setProfileError(null);
-        setProfileSuccess(null);
-        try {
-          const token = await currentUser.getIdToken();
-          const res = await fetch("/api/profile", {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+    try {
+      unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        if (!isMounted) return;
+        setUser(currentUser);
 
-          if (res.ok) {
-            const data = await res.json();
-            setFormData({
-              displayName: data.displayName || currentUser.displayName || "",
-              university: data.university || "",
-              faculty: data.faculty || "",
-              department: data.department || "",
-              major: data.major || "",
-              skills: data.skills || "",
-              motivation: data.motivation || "",
+        if (currentUser) {
+          setProfileLoading(true);
+          setProfileError(null);
+          setProfileSuccess(null);
+          try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch("/api/profile", {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             });
-          } else if (res.status === 404) {
-            // 未保存の場合はGoogleの表示名を初期値に設定
-            setFormData({
-              ...initialFormData,
-              displayName: currentUser.displayName || "",
-            });
-          } else {
-            const errData = await res.json().catch(() => ({}));
-            setProfileError(errData.error || "プロフィールの読み込みに失敗しました。");
-            setFormData({
-              ...initialFormData,
-              displayName: currentUser.displayName || "",
-            });
+
+            if (!isMounted) return;
+
+            if (res.ok) {
+              const data = await res.json();
+              setFormData({
+                displayName: data.displayName || currentUser.displayName || "",
+                university: data.university || "",
+                faculty: data.faculty || "",
+                department: data.department || "",
+                major: data.major || "",
+                skills: data.skills || "",
+                motivation: data.motivation || "",
+              });
+            } else if (res.status === 404) {
+              // 未保存の場合はGoogleの表示名を初期値に設定
+              setFormData({
+                ...initialFormData,
+                displayName: currentUser.displayName || "",
+              });
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              setProfileError(errData.error || "プロフィールの読み込みに失敗しました。");
+              setFormData({
+                ...initialFormData,
+                displayName: currentUser.displayName || "",
+              });
+            }
+          } catch {
+            if (isMounted) {
+              setProfileError("プロフィールの読み込み中に通信エラーが発生しました。");
+              setFormData({
+                ...initialFormData,
+                displayName: currentUser.displayName || "",
+              });
+            }
+          } finally {
+            if (isMounted) {
+              setProfileLoading(false);
+            }
           }
-        } catch {
-          setProfileError("プロフィールの読み込み中に通信エラーが発生しました。");
-          setFormData({
-            ...initialFormData,
-            displayName: currentUser.displayName || "",
-          });
-        } finally {
-          setProfileLoading(false);
+        } else {
+          setFormData(initialFormData);
+          setProfileError(null);
+          setProfileSuccess(null);
+          handleResetIdea();
         }
-      } else {
-        setFormData(initialFormData);
-        setProfileError(null);
-        setProfileSuccess(null);
-        handleResetIdea();
-      }
-    });
+      });
+    } catch (err) {
+      console.error("Auth初期化エラー:", err);
+    }
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const handleLogin = async () => {
     setError(null);
+    setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
+      console.error("ログインエラー詳細:", err);
       const authError = err as { code?: string; message?: string };
       if (authError.code === "auth/popup-blocked") {
-        setError("ポップアップがブロックされました。ブラウザの設定でポップアップを許可してください。");
+        setError("ブラウザによってログインポップアップがブロックされました。アドレスバー右側の設定でポップアップを許可してください。");
       } else if (authError.code === "auth/popup-closed-by-user") {
-        setError("ログイン用ポップアップが閉じられました。");
+        setError("ログイン画面が途中で閉じられました。もう一度お試しください。");
       } else if (authError.code === "auth/cancelled-popup-request") {
         setError("直前の認証リクエストがキャンセルされました。もう一度お試しください。");
       } else if (authError.code === "auth/network-request-failed") {
         setError("通信エラーが発生しました。ネットワーク接続を確認してください。");
+      } else if (authError.code === "auth/unauthorized-domain") {
+        const currentDomain = typeof window !== "undefined" ? window.location.hostname : "";
+        setError(
+          `このドメイン（${currentDomain}）はFirebase Authenticationの「承認済みドメイン」に登録されていません。Firebaseコンソール（Authentication > 設定 > 承認済みドメイン）に「${currentDomain}」を追加してください。`
+        );
       } else {
-        setError("ログインに失敗しました。もう一度お試しください。");
+        setError(
+          `ログインエラー (${authError.code || "不明"}): ${
+            authError.message || "もう一度お試しください。"
+          }`
+        );
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -422,6 +513,51 @@ export default function Home() {
     }
   };
 
+  // 足りない役割に合う学生候補をAIでマッチング
+  const handleMatchStudents = async (ideaId: string) => {
+    if (!user) {
+      setMatchingError("学生候補の提案機能を利用するにはログインが必要です。");
+      return;
+    }
+    setMatchingLoading(true);
+    setMatchingError(null);
+    setMatchingMessage(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/ideas/${ideaId}/match`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMatchingError(data.error || "学生候補の提案に失敗しました。");
+        return;
+      }
+
+      setMatchingMessage(data.message || null);
+      if (selectedIdea && selectedIdea.id === ideaId) {
+        setSelectedIdea({
+          ...selectedIdea,
+          aiSuggestions: data.suggestions || [],
+        });
+      }
+      setPublishedIdeas((prev) =>
+        prev.map((item) =>
+          item.id === ideaId
+            ? { ...item, aiSuggestions: data.suggestions || [] }
+            : item
+        )
+      );
+    } catch {
+      setMatchingError("通信エラーが発生しました。もう一度お試しください。");
+    } finally {
+      setMatchingLoading(false);
+    }
+  };
+
   const formatDate = (isoString: string | null) => {
     if (!isoString) return "";
     try {
@@ -547,6 +683,8 @@ export default function Home() {
               onClick={() => {
                 setActiveTab("ideas");
                 setSelectedIdea(null);
+                setMatchingError(null);
+                setMatchingMessage(null);
               }}
               className={`py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 activeTab === "ideas"
@@ -598,7 +736,11 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
-                      onClick={() => setSelectedIdea(null)}
+                      onClick={() => {
+                        setSelectedIdea(null);
+                        setMatchingError(null);
+                        setMatchingMessage(null);
+                      }}
                       className="px-4 py-1.5 rounded-full border border-[#F5B301] bg-[#FFF8E1] text-[#4A2C0A] text-xs sm:text-sm font-bold hover:bg-[#F5B301]/40 transition-colors flex items-center gap-1.5"
                     >
                       <span>← 一覧に戻る</span>
@@ -709,6 +851,117 @@ export default function Home() {
                         </ol>
                       </div>
                     )}
+
+                    {/* 足りない役割に合う学生の提案（AIマッチング） */}
+                    <div className="pt-4 border-t border-[#F5B301]/40 flex flex-col gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div>
+                          <h3 className="text-sm sm:text-base font-bold text-[#4A2C0A] flex items-center gap-1.5">
+                            <span>🤝</span>
+                            <span>足りない役割に合う学生の提案</span>
+                          </h3>
+                          <p className="text-xs text-[#4A2C0A]/70 mt-0.5">
+                            Geminiが募集中の役割を読み取り、登録された学生のスキルから最適な候補と推薦理由を提案します。
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleMatchStudents(selectedIdea.id)}
+                          disabled={matchingLoading}
+                          className="w-full sm:w-auto px-4 py-2 rounded-full bg-[#F5B301] text-[#4A2C0A] text-xs font-bold hover:bg-[#E0A200] active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50"
+                        >
+                          {matchingLoading ? (
+                            <>
+                              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              <span>AIが候補を選定中...</span>
+                            </>
+                          ) : (
+                            <span>
+                              {selectedIdea.aiSuggestions && selectedIdea.aiSuggestions.length > 0
+                                ? "最新スキルから再提案"
+                                : "AIで学生候補を提案してもらう"}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* マッチングステータス / エラー表示 */}
+                      {matchingError && (
+                        <div
+                          role="alert"
+                          className="w-full p-3 rounded-xl bg-[#FFF1DC] text-[#7A2500] text-xs font-medium border border-[#F5B301]"
+                        >
+                          エラー: {matchingError}
+                        </div>
+                      )}
+
+                      {matchingMessage && (
+                        <div
+                          role="status"
+                          className="w-full p-2.5 rounded-xl bg-[#FFF8E1] text-[#4A2C0A] text-xs font-semibold border border-[#F5B301]/60"
+                        >
+                          {matchingMessage}
+                        </div>
+                      )}
+
+                      {/* 提案された候補リスト */}
+                      {selectedIdea.aiSuggestions && selectedIdea.aiSuggestions.length > 0 ? (
+                        <div className="flex flex-col gap-3 mt-1">
+                          {selectedIdea.aiSuggestions.map((candidate, cIdx) => (
+                            <div
+                              key={cIdx}
+                              className="p-4 rounded-xl bg-[#FFF8E1]/90 border border-[#F5B301] shadow-sm flex flex-col gap-2.5"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-[#F5B301] text-[#4A2C0A]">
+                                  推薦する役割: {candidate.matchedRole}
+                                </span>
+                                <div className="text-xs text-[#4A2C0A]/80">
+                                  <span className="font-bold text-sm text-[#4A2C0A] mr-1">
+                                    {candidate.displayName}
+                                  </span>
+                                  <span>さん</span>
+                                  {(candidate.university || candidate.faculty || candidate.major) && (
+                                    <span className="ml-1.5 text-[#4A2C0A]/60">
+                                      (
+                                      {[
+                                        candidate.university,
+                                        candidate.faculty,
+                                        candidate.department,
+                                        candidate.major,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                      )
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-[#4A2C0A]/85 bg-[#FFFDF5] p-2.5 rounded-lg border border-[#F5B301]/30">
+                                <span className="font-bold text-[#4A2C0A] block mb-0.5">
+                                  登録スキル（できること）:
+                                </span>
+                                <p className="whitespace-pre-wrap">{candidate.skills}</p>
+                              </div>
+
+                              <div className="text-xs text-[#7A3E00] bg-[#FFFBEB] p-2.5 rounded-lg border border-[#F5B301]/50">
+                                <span className="font-bold block mb-0.5">
+                                  💡 AIがこの学生を選んだ理由:
+                                </span>
+                                <p className="leading-relaxed whitespace-pre-wrap">{candidate.reason}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        !matchingLoading && (
+                          <div className="p-4 rounded-xl bg-[#FFF8E1]/50 border border-[#F5B301]/30 text-xs text-[#4A2C0A]/70 text-center">
+                            「AIで学生候補を提案してもらう」ボタンを押すと、登録された学生の中からこのプロジェクトの各役割に合う候補と理由をGeminiが提案します。
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -717,9 +970,24 @@ export default function Home() {
                     <h2 className="text-lg sm:text-xl font-bold text-[#4A2C0A]">
                       公開されたアイデア一覧
                     </h2>
-                    <span className="text-xs font-medium text-[#4A2C0A]/70">
-                      {publishedIdeas.length} 件
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-[#4A2C0A]/70">
+                        {publishedIdeas.length} 件
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdeasLoading(true);
+                          fetchPublishedIdeas(selectedField);
+                        }}
+                        disabled={ideasLoading}
+                        title="最新の一覧に更新"
+                        className="px-2.5 py-1 rounded-full text-xs font-bold border border-[#F5B301] bg-[#FFF8E1] text-[#4A2C0A] hover:bg-[#F5B301]/30 disabled:opacity-50 transition-colors flex items-center gap-1"
+                      >
+                        <span>🔄</span>
+                        <span>更新</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* 分野フィルターバー */}
@@ -810,9 +1078,16 @@ export default function Home() {
                             )}
                           </div>
 
-                          <h3 className="text-base sm:text-lg font-bold text-[#4A2C0A]">
-                            {idea.title}
-                          </h3>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-base sm:text-lg font-bold text-[#4A2C0A]">
+                              {idea.title}
+                            </h3>
+                            {idea.aiSuggestions && idea.aiSuggestions.length > 0 && (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF8E1] text-[#7A3E00] border border-[#F5B301]/60 shrink-0">
+                                候補 {idea.aiSuggestions.length}名
+                              </span>
+                            )}
+                          </div>
 
                           <p className="text-xs sm:text-sm text-[#4A2C0A]/85 line-clamp-2 leading-relaxed">
                             {idea.goal}
@@ -853,7 +1128,11 @@ export default function Home() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => setSelectedIdea(idea)}
+                              onClick={() => {
+                                setSelectedIdea(idea);
+                                setMatchingError(null);
+                                setMatchingMessage(null);
+                              }}
                               className="w-full sm:w-auto px-4 py-1.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-xs font-bold hover:bg-[#E0A200] transition-colors shadow-sm text-center"
                             >
                               詳細を見る
@@ -882,10 +1161,46 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] transition-all flex items-center gap-2"
+                  disabled={loading}
+                  className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Googleでログイン
+                  {loading ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      <span>ログイン処理中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="#4285F4"
+                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.97 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                        />
+                      </svg>
+                      <span>Googleでログイン</span>
+                    </>
+                  )}
                 </button>
+                {error && (
+                  <div
+                    role="alert"
+                    className="w-full max-w-md p-3.5 rounded-xl bg-[#FFF1DC] text-[#7A2500] text-xs font-medium border border-[#F5B301] text-left shadow-sm mt-1"
+                  >
+                    {error}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="w-full flex flex-col gap-5 text-left">
@@ -1177,10 +1492,46 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] transition-all flex items-center gap-2"
+                  disabled={loading}
+                  className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#4A2C0A] text-sm font-bold shadow-md hover:bg-[#E0A200] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Googleでログイン
+                  {loading ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      <span>ログイン処理中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="#4285F4"
+                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.97 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                        />
+                      </svg>
+                      <span>Googleでログイン</span>
+                    </>
+                  )}
                 </button>
+                {error && (
+                  <div
+                    role="alert"
+                    className="w-full max-w-md p-3.5 rounded-xl bg-[#FFF1DC] text-[#7A2500] text-xs font-medium border border-[#F5B301] text-left shadow-sm mt-1"
+                  >
+                    {error}
+                  </div>
+                )}
               </div>
             ) : profileLoading ? (
               <div className="flex items-center justify-center gap-2 py-8 text-[#4A2C0A]/70 font-medium">

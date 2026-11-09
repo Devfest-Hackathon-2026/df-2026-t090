@@ -227,6 +227,7 @@ export async function GET(request: Request) {
           data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null
         ),
         author,
+        aiSuggestions: Array.isArray(data.aiSuggestions) ? data.aiSuggestions : [],
       };
     });
 
