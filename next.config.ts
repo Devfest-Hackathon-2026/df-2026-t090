@@ -6,8 +6,6 @@ const nextConfig: NextConfig = {
     "*.cloudshell.dev",
     "3000-cs-64ecbbd7-f4a6-4701-8190-e6af0d766ec7.cs-asia-east1-duck.cloudshell.dev",
   ],
-  cacheComponents: true,
-  partialPrefetching: true,
   turbopack: {
     rules: {
       "*.css": {
