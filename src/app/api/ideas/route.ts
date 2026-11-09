@@ -137,3 +137,118 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "アイデアの保存中にエラーが発生しました。" }, { status: 500 });
   }
 }
+
+/**
+ * GET /api/ideas
+ * 公開されたアイデアの一覧を取得します。
+ * クエリパラメータ:
+ *   - field: 分野で絞り込み（任意、"すべて"の場合は全件）
+ *
+ * 条件遵守:
+ *   - メールアドレスと本名は他者に見せない（displayName, university, faculty, department, majorのみ返却）
+ *   - データベースアクセスはサーバー側（Firestore Admin）のみ
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const fieldParam = searchParams.get("field")?.trim();
+
+    const db = getAdminDb();
+    // 公開済みのアイデアを取得（単一フィールドのインデックスのみ使用）
+    const snapshot = await db.collection("ideas")
+      .where("status", "==", "published")
+      .get();
+
+    if (snapshot.empty) {
+      return NextResponse.json({ ideas: [] });
+    }
+
+    // 投稿者（ownerUid）のプロフィールを取得（メールアドレスや本名を含まない安全な情報のみ）
+    const ownerUids = Array.from(
+      new Set(
+        snapshot.docs
+          .map((doc) => doc.data().ownerUid)
+          .filter((uid): uid is string => typeof uid === "string" && uid.length > 0)
+      )
+    );
+
+    const userMap = new Map<string, {
+      displayName: string;
+      university: string;
+      faculty: string;
+      department: string;
+      major: string;
+    }>();
+
+    if (ownerUids.length > 0) {
+      const chunkSize = 100;
+      for (let i = 0; i < ownerUids.length; i += chunkSize) {
+        const chunk = ownerUids.slice(i, i + chunkSize);
+        const refs = chunk.map((uid) => db.collection("users").doc(uid));
+        const userDocs = await db.getAll(...refs);
+        for (const uDoc of userDocs) {
+          if (uDoc.exists) {
+            const uData = uDoc.data();
+            userMap.set(uDoc.id, {
+              displayName: typeof uData?.displayName === "string" ? uData.displayName : "HIVEメンバー",
+              university: typeof uData?.university === "string" ? uData.university : "",
+              faculty: typeof uData?.faculty === "string" ? uData.faculty : "",
+              department: typeof uData?.department === "string" ? uData.department : "",
+              major: typeof uData?.major === "string" ? uData.major : "",
+            });
+          }
+        }
+      }
+    }
+
+    const ideas = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const author = userMap.get(data.ownerUid) || {
+        displayName: "HIVEメンバー",
+        university: "",
+        faculty: "",
+        department: "",
+        major: "",
+      };
+
+      const result = data.result || {};
+      const fields: string[] = Array.isArray(result.fields) ? result.fields : [];
+
+      return {
+        id: doc.id,
+        ownerUid: data.ownerUid,
+        title: typeof result.title === "string" ? result.title : "無題のアイデア",
+        goal: typeof result.goal === "string" ? result.goal : "",
+        fields,
+        roles: Array.isArray(result.roles) ? result.roles : [],
+        firstSteps: Array.isArray(result.firstSteps) ? result.firstSteps : [],
+        rawText: typeof data.rawText === "string" ? data.rawText : "",
+        publishedAt: data.publishedAt?.toDate ? data.publishedAt.toDate().toISOString() : (
+          data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null
+        ),
+        author,
+      };
+    });
+
+    // 公開日時が新しい順にソート（インメモリーで安全にソート）
+    ideas.sort((a, b) => {
+      const timeA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const timeB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    // 分野フィルターの適用
+    const filteredIdeas = (fieldParam && fieldParam !== "すべて" && fieldParam !== "all")
+      ? ideas.filter((idea) => idea.fields.includes(fieldParam))
+      : ideas;
+
+    return NextResponse.json({ ideas: filteredIdeas });
+  } catch (error) {
+    console.error("公開アイデア一覧取得エラー:", error);
+    return NextResponse.json(
+      { error: "アイデア一覧の取得中にエラーが発生しました。" },
+      { status: 500 }
+    );
+  }
+}
+
