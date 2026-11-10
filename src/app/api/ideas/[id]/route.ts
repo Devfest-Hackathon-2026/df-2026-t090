@@ -25,10 +25,14 @@ export async function GET(
     }
 
     const data = docSnap.data();
-    const isPublished = data?.status === "published";
+    const isPublicAccessible =
+      data?.status === "published" ||
+      data?.status === "in_progress" ||
+      data?.status === "completed" ||
+      Boolean(data?.isSample);
 
-    // 公開されていないアイデアは投稿者本人のみ読み取り可能
-    if (!isPublished) {
+    // 非公開かつサンプルでもないアイデアは投稿者本人のみ読み取り可能
+    if (!isPublicAccessible) {
       const authUser = await authenticate(request);
       if (!authUser) {
         return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
@@ -63,12 +67,18 @@ export async function GET(
 
     return NextResponse.json({
       id: docSnap.id,
+      title: data?.title || data?.result?.title || "プロジェクト",
+      goal: data?.goal || data?.result?.goal || "",
+      status: data?.status ?? "draft",
+      isCompleted: Boolean(data?.isCompleted),
+      isSample: Boolean(data?.isSample),
+      stages: Array.isArray(data?.stages) ? data.stages : [],
+      progressSummaryText: data?.progressSummaryText || null,
       ownerUid: data?.ownerUid,
       rawText: data?.rawText ?? "",
       questions: data?.questions ?? [],
       answers: data?.answers ?? null,
       result: data?.result ?? null,
-      status: data?.status ?? "draft",
       createdAt: data?.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null,
       updatedAt: data?.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : null,
       publishedAt: data?.publishedAt?.toDate ? data.publishedAt.toDate().toISOString() : null,

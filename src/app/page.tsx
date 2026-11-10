@@ -67,6 +67,30 @@ interface ProjectMemberResponseItem {
   isFacilitator: boolean;
 }
 
+function parseWorkspaceNav(nav: string): {
+  projectId: string | null;
+  subTab: "chat" | "files" | "calendar" | "members";
+} {
+  if (!nav.startsWith("workspace-")) {
+    return { projectId: null, subTab: "chat" };
+  }
+  const raw = nav.slice("workspace-".length);
+  if (raw.endsWith("-chat")) {
+    return { projectId: raw.slice(0, -"-chat".length), subTab: "chat" };
+  }
+  if (raw.endsWith("-files")) {
+    return { projectId: raw.slice(0, -"-files".length), subTab: "files" };
+  }
+  if (raw.endsWith("-schedule") || raw.endsWith("-calendar")) {
+    const suffix = raw.endsWith("-schedule") ? "-schedule" : "-calendar";
+    return { projectId: raw.slice(0, -suffix.length), subTab: "calendar" };
+  }
+  if (raw.endsWith("-members")) {
+    return { projectId: raw.slice(0, -"-members".length), subTab: "members" };
+  }
+  return { projectId: raw, subTab: "chat" };
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -401,10 +425,53 @@ export default function Home() {
     }
   };
 
+  // ──────── プロジェクトIDおよびサブタブの正確なパース ────────
+  const parsedWorkspace = parseWorkspaceNav(activeNav);
+  const activeProjectId = parsedWorkspace.projectId;
+  const currentSubTab = parsedWorkspace.subTab || workspaceSubTab || "chat";
+
+  // ──────── 開いているプロジェクト詳細の動的取得 ────────
+  const [activeProjectDetail, setActiveProjectDetail] = useState<{
+    id: string;
+    title: string;
+    goal: string;
+    progressSummaryText?: string;
+    isSample?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!activeProjectId) return;
+
+    let active = true;
+    const fetchProjectDetail = async () => {
+      try {
+        const token = user ? await user.getIdToken() : null;
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`/api/ideas/${activeProjectId}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) {
+            setActiveProjectDetail({
+              id: data.id,
+              title: data.title || data.result?.title || "プロジェクト",
+              goal: data.goal || data.result?.goal || "",
+              progressSummaryText: data.progressSummaryText || undefined,
+              isSample: Boolean(data.isSample),
+            });
+          }
+        }
+      } catch (err) {
+        console.error("プロジェクト詳細取得エラー:", err);
+      }
+    };
+
+    fetchProjectDetail();
+    return () => {
+      active = false;
+    };
+  }, [activeProjectId, user]);
+
   // ──────── W06 チャットメッセージの取得・ポーリング ────────
-  const activeProjectId = activeNav.startsWith("workspace")
-    ? activeNav.split("-")[1]
-    : null;
 
   const fetchChatMessages = useCallback(async () => {
     if (!user || !activeProjectId) return;
@@ -1797,29 +1864,22 @@ export default function Home() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-base sm:text-lg font-black text-[#3D2406]">
-                        {activeProjectId === "demo-idea-craft-beer"
-                          ? "地域伝統クラフトビール開発"
-                          : activeProjectId === "demo-idea-campus-map"
-                          ? "学内空き教室リアルタイム共有"
-                          : activeProjectId === "demo-completed-pj" || activeProjectId === "demo-idea-bamboo-lamp"
-                          ? "放置竹林サステナブル照明 (第1期)"
-                          : "プロジェクト作業画面"}
+                        {activeProjectDetail?.title || "プロジェクト作業画面"}
                       </h2>
-                      <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/40 text-[#B87503] text-[10px] font-bold">
-                        サンプルデータ
-                      </span>
+                      {activeProjectDetail?.isSample && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/40 text-[#B87503] text-[10px] font-bold">
+                          サンプルデータ
+                        </span>
+                      )}
                     </div>
 
                     {/* 進み具合（段階ごとの状態） */}
-                    <p className="text-[11px] text-[#5C3D15] mt-0.5">
-                      <span className="font-bold text-[#3D2406]">進み具合: </span>
-                      {activeProjectId === "demo-idea-craft-beer" &&
-                        "コンセプトの決定と利用者の調査【完了】／醸造所との試作レシピの調整と試醸【進行中】／ラベルデザインの決定と試飲イベントの企画【未着手】"}
-                      {activeProjectId === "demo-idea-campus-map" &&
-                        "要件定義と画面設計【完了】／データベースの設計と API の実装【進行中】／学内での実証テストと導入【未着手】"}
-                      {(activeProjectId === "demo-completed-pj" || activeProjectId === "demo-idea-bamboo-lamp") &&
-                        "竹の調達・加工方法と構造の設計【完了】／回路の設計・加工・使いやすさの評価【完了】／試作品の完成と展示での意見集め【完了】"}
-                    </p>
+                    {activeProjectDetail?.progressSummaryText && (
+                      <p className="text-[11px] text-[#5C3D15] mt-0.5">
+                        <span className="font-bold text-[#3D2406]">進み具合: </span>
+                        {activeProjectDetail.progressSummaryText}
+                      </p>
+                    )}
 
                     <span className="text-xs text-[#7A5726]">
                       共創チーム作業スペース（チャット / ファイル / 空き時間 / メンバー）
@@ -1861,9 +1921,16 @@ export default function Home() {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setWorkspaceSubTab(tab.id as "chat" | "files" | "calendar" | "members")}
+                    onClick={() => {
+                      const nextTab = tab.id as "chat" | "files" | "calendar" | "members";
+                      setWorkspaceSubTab(nextTab);
+                      if (activeProjectId) {
+                        const navSuffix = nextTab === "calendar" ? "schedule" : nextTab;
+                        setActiveNav(`workspace-${activeProjectId}-${navSuffix}`);
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      workspaceSubTab === tab.id
+                      currentSubTab === tab.id
                         ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
                         : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
                     }`}
@@ -1950,7 +2017,7 @@ export default function Home() {
               )}
 
               {/* チャットサブタブの表示 */}
-              {workspaceSubTab === "chat" && (
+              {currentSubTab === "chat" && (
                 <>
                   {/* ルーム切り替えタブ */}
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -2116,7 +2183,7 @@ export default function Home() {
               )}
 
               {/* 共有ファイルサブタブ */}
-              {workspaceSubTab === "files" && (
+              {currentSubTab === "files" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-[#3D2406]">共有ファイル一覧</span>
@@ -2147,7 +2214,7 @@ export default function Home() {
               )}
 
               {/* 空き時間重ね合わせサブタブ */}
-              {workspaceSubTab === "calendar" && (
+              {currentSubTab === "calendar" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-[#3D2406]">メンバーの空き時間ヒートマップ</span>
@@ -2179,7 +2246,7 @@ export default function Home() {
               )}
 
               {/* メンバー一覧サブタブ */}
-              {workspaceSubTab === "members" && (
+              {currentSubTab === "members" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div>

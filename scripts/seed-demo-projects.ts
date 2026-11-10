@@ -4,7 +4,7 @@ import { getAdminDb, FieldValue } from "../src/lib/firebase-admin";
  * ハッカソン審査用デモプロジェクトデータ投入スクリプト
  * - 3つのプロジェクト（地域伝統クラフトビール開発、学内空き教室リアルタイム共有、放置竹林サステナブル照明）
  * - 各プロジェクトのメンバー4名
- * - 日本時間固定の日時を持つ発言履歴
+ * - 日本時間固定の日時を持つ発言履歴（追加発言を反映）
  * - 進み具合（段階ごとの状態）と isSample: true
  */
 
@@ -35,7 +35,7 @@ interface DemoMessage {
 
 interface DemoProject {
   id: string;
-  aliasId?: string; // 終了プロジェクト等で2つのIDに対応
+  aliasId?: string;
   title: string;
   goal: string;
   status: "in_progress" | "completed";
@@ -59,9 +59,9 @@ const DEMO_PROJECTS: DemoProject[] = [
     stages: [
       { name: "コンセプトの決定と利用者の調査", status: "completed", statusLabel: "完了" },
       { name: "醸造所との試作レシピの調整と試醸", status: "in_progress", statusLabel: "進行中" },
-      { name: "ラベルデザインの決定と試飲イベントの企画", status: "not_started", statusLabel: "未着手" },
+      { name: "ラベルデザインの決定と試飲イベントの企画", status: "in_progress", statusLabel: "進行中" },
     ],
-    progressSummaryText: "コンセプトの決定と利用者の調査【完了】／醸造所との試作レシピの調整と試醸【進行中】／ラベルデザインの決定と試飲イベントの企画【未着手】",
+    progressSummaryText: "コンセプトの決定と利用者の調査【完了】／醸造所との試作レシピの調整と試醸【進行中】／ラベルデザインの決定と試飲イベントの企画【進行中】",
     members: [
       {
         userId: "student-male-watanabe",
@@ -162,6 +162,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-09-25 09:30",
       },
       {
+        id: "msg-beer-add-01",
+        senderUid: "student-female-matsumoto",
+        senderName: "松本 さくら",
+        senderSchool: "東京大学 文学部",
+        senderRole: "リサーチ",
+        text: "柑橘の香りがどう受け入れられるかについて、近くのお店への聞き取りを進めていて、料理との相性についての回答がほぼそろいました。醸造所での第1ロットの仕込みを待ちつつ、評価シートの項目づくりに取りかかっています。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-09-29 15:40",
+      },
+      {
         id: "msg-beer-06",
         senderUid: "student-male-tanaka",
         senderName: "田中 健太",
@@ -171,6 +182,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-10-02 13:00",
+      },
+      {
+        id: "msg-beer-add-02",
+        senderUid: "student-female-sato",
+        senderName: "佐藤 澪",
+        senderSchool: "武蔵野美術大学 造形構想学部",
+        senderRole: "デザイン",
+        text: "初期案をもとに、醸造所の雰囲気にも合うようにラベルの枠の寸法を調整していて、イラストの配置は確定させました。あとは11月10日までに、瓶と缶の両方で使える完成版のデータを出して、デザインを確定する予定です。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-03 14:00",
       },
       {
         id: "msg-beer-07",
@@ -184,6 +206,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-10-09 17:45",
       },
       {
+        id: "msg-beer-add-03",
+        senderUid: "student-female-matsumoto",
+        senderName: "松本 さくら",
+        senderSchool: "東京大学 文学部",
+        senderRole: "リサーチ",
+        text: "試飲の評価シートの質問に「香りの強さ」「後味のキレ」「地域の特産品らしさ」を5段階で入れることで合意しました。今はオンラインで入力するフォームを作っていて、11月12日の田中さんの復帰までに下書きを完成させます。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-14 13:15",
+      },
+      {
         id: "msg-beer-08",
         senderUid: "student-male-tanaka",
         senderName: "田中 健太",
@@ -193,6 +226,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-10-15 10:20",
+      },
+      {
+        id: "msg-beer-add-04",
+        senderUid: "student-female-sato",
+        senderName: "佐藤 澪",
+        senderSchool: "武蔵野美術大学 造形構想学部",
+        senderRole: "デザイン",
+        text: "瓶用のラベルの色を、秋らしい温かみのある色合いに絞り込みました。今は印刷用の画像を微調整していて、11月13日のスライドの提出に合わせて、発表用の高解像度のデータも一緒に出します。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-18 16:30",
       },
       {
         id: "msg-beer-09",
@@ -248,6 +292,28 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-11-05 16:30",
+      },
+      {
+        id: "msg-beer-add-05",
+        senderUid: "student-female-sato",
+        senderName: "佐藤 澪",
+        senderSchool: "武蔵野美術大学 造形構想学部",
+        senderRole: "デザイン",
+        text: "渡辺さんが立ち会ってくれた瓶詰めの現物の写真を確認して、ラベルの位置の最終調整に入りました。デザインのデータはほぼ組み上がっていて、11月12日の田中さんの復帰に合わせて、最終確認用の試し刷りを共有する予定です。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-11-06 11:20",
+      },
+      {
+        id: "msg-beer-add-06",
+        senderUid: "student-female-matsumoto",
+        senderName: "松本 さくら",
+        senderSchool: "東京大学 文学部",
+        senderRole: "リサーチ",
+        text: "渡辺さんの瓶詰めの報告を踏まえて、アンケートのフォームの最終的な動作確認をしています。田中さんが復帰する11月12日までにフォームを全員に共有し、11月15日の評価の入力締め切りに向けた案内を出す予定です。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-11-07 10:50",
       },
       {
         id: "msg-beer-14",
@@ -366,6 +432,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-09-28 14:15",
       },
       {
+        id: "msg-campus-add-01",
+        senderUid: "student-female-ito",
+        senderName: "伊藤 葵",
+        senderSchool: "京都大学 理学部",
+        senderRole: "データサイエンス",
+        text: "中村さんの API 仕様に合わせて過去3か月分の学内の利用データの前処理を終え、混み具合の予測の調整をしています。予測は15分おきに自動で計算する形で確定しました。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-05 16:10",
+      },
+      {
         id: "msg-campus-05",
         senderUid: "student-male-nakamura",
         senderName: "中村 蓮",
@@ -377,6 +454,39 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-10-12 16:50",
       },
       {
+        id: "msg-campus-add-02",
+        senderUid: "student-female-ito",
+        senderName: "伊藤 葵",
+        senderSchool: "京都大学 理学部",
+        senderRole: "データサイエンス",
+        text: "中村さんのバックエンドのデータベースとの接続テストをして、予測の応答の正確さを評価しています。教室ごとの混雑の判定の仕組みは、実用できる水準で固まりました。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-21 14:45",
+      },
+      {
+        id: "msg-campus-add-03",
+        senderUid: "student-female-takahashi",
+        senderName: "高橋 陽菜",
+        senderSchool: "東京学芸大学 教育学部",
+        senderRole: "エデュケーター",
+        text: "今日からチームに参加しました。教育学部で、学生向けの使い方の案内資料づくりを担当します。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-26 19:00",
+      },
+      {
+        id: "msg-campus-add-04",
+        senderUid: "student-female-takahashi",
+        senderName: "高橋 陽菜",
+        senderSchool: "東京学芸大学 教育学部",
+        senderRole: "エデュケーター",
+        text: "使い方の案内資料の構成案を作りました。「空き教室の探し方」「混み具合の見方」「困ったときの問い合わせ先」の3章にします。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-30 18:20",
+      },
+      {
         id: "msg-campus-06",
         senderUid: "student-female-suzuki",
         senderName: "鈴木 結愛",
@@ -386,6 +496,39 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-11-02 10:00",
+      },
+      {
+        id: "msg-campus-add-05",
+        senderUid: "student-female-ito",
+        senderName: "伊藤 葵",
+        senderSchool: "京都大学 理学部",
+        senderRole: "データサイエンス",
+        text: "鈴木さんの結合テストの完了を受けて、予測の最終的な正確さの確認と調整をしています。予測のコードは完成していて、11月15日の実証テスト用の環境の公開までに、計算の処理を速くする作業を終えます。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-11-03 11:30",
+      },
+      {
+        id: "msg-campus-add-06",
+        senderUid: "student-female-takahashi",
+        senderName: "高橋 陽菜",
+        senderSchool: "東京学芸大学 教育学部",
+        senderRole: "エデュケーター",
+        text: "鈴木さんと相談し、案内資料は画面の写真を入れた1枚ものにすることに決まりました。β版の画面が固まったら写真を撮ります。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-11-04 17:40",
+      },
+      {
+        id: "msg-campus-add-07",
+        senderUid: "student-female-takahashi",
+        senderName: "高橋 陽菜",
+        senderSchool: "東京学芸大学 教育学部",
+        senderRole: "エデュケーター",
+        text: "学内での実証テストの前までに、案内資料の下書きを仕上げます。締め切りは11月20日の予定です。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-11-07 20:10",
       },
     ],
   },
@@ -471,6 +614,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-09-07 14:00",
       },
       {
+        id: "msg-bamboo-add-01",
+        senderUid: "student-male-kobayashi",
+        senderName: "小林 大地",
+        senderSchool: "慶應義塾大学 看護医療学部",
+        senderRole: "アクセシビリティ",
+        text: "竹のシェードの角を落とす加工と、点灯したときの表面の温度の安全性の確認を進めています。スイッチは、手のひら全体で押せる形にすることに決めました。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-09-11 10:30",
+      },
+      {
         id: "msg-bamboo-03",
         senderUid: "student-male-yamamoto",
         senderName: "山本 翔太",
@@ -480,6 +634,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-09-15 11:30",
+      },
+      {
+        id: "msg-bamboo-add-02",
+        senderUid: "student-male-watanabe",
+        senderName: "渡辺 航",
+        senderSchool: "一橋大学 商学部",
+        senderRole: "ビジネス",
+        text: "竹の採集と乾燥にかかる人件費と、LED の部品の仕入れ値の試算を進めています。販売の利益の15%を地元の竹林の保全活動に回す案で進めています。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-09-18 13:50",
       },
       {
         id: "msg-bamboo-04",
@@ -493,6 +658,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-09-22 16:00",
       },
       {
+        id: "msg-bamboo-add-03",
+        senderUid: "student-male-kobayashi",
+        senderName: "小林 大地",
+        senderSchool: "慶應義塾大学 看護医療学部",
+        senderRole: "アクセシビリティ",
+        text: "山本さんの LED 基板の試作と合わせて操作感のテストをしていて、スイッチを押す力が今までの半分で済むように設計を変えました。10月5日までに、実際に使う強さでの負荷テストを終えます。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-09-28 15:00",
+      },
+      {
         id: "msg-bamboo-05",
         senderUid: "student-male-watanabe",
         senderName: "渡辺 航",
@@ -502,6 +678,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-09-30 13:20",
+      },
+      {
+        id: "msg-bamboo-add-04",
+        senderUid: "student-male-watanabe",
+        senderName: "渡辺 航",
+        senderSchool: "一橋大学 商学部",
+        senderRole: "ビジネス",
+        text: "完成後の販売先として、学内のクラフト市や地域の環境イベントでの展示販売を検討していて、収支の見込みの最終確認をしています。製品の価格と、竹林の保全に回す額の割合は計算済みです。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-04 16:20",
       },
       {
         id: "msg-bamboo-06",
@@ -515,6 +702,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         createdAtJST: "2026-10-10 15:00",
       },
       {
+        id: "msg-bamboo-add-05",
+        senderUid: "student-male-kobayashi",
+        senderName: "小林 大地",
+        senderSchool: "慶應義塾大学 看護医療学部",
+        senderRole: "アクセシビリティ",
+        text: "山本さんが組み立てた試作品の安全の確認と、誰でも使いやすいかの評価の記録を整理しています。本体が倒れにくい作りとスイッチの見やすさは基準を満たしたので、10月19日までにギャラリーの展示用の説明パネルを作ります。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-16 11:40",
+      },
+      {
         id: "msg-bamboo-07",
         senderUid: "student-female-sato",
         senderName: "佐藤 澪",
@@ -524,6 +722,17 @@ const DEMO_PROJECTS: DemoProject[] = [
         isAnnouncement: false,
         confirmedUserUids: [],
         createdAtJST: "2026-10-20 17:00",
+      },
+      {
+        id: "msg-bamboo-add-06",
+        senderUid: "student-male-watanabe",
+        senderName: "渡辺 航",
+        senderSchool: "一橋大学 商学部",
+        senderRole: "ビジネス",
+        text: "佐藤さんのギャラリーの展示で得られた反応をもとに、事業にしたときの損益分岐点の分析を整理しています。事業として成り立つかの評価は終わっていて、10月30日の最終の成果報告書の提出に向けて、ビジネスの部分をまとめます。",
+        isAnnouncement: false,
+        confirmedUserUids: [],
+        createdAtJST: "2026-10-25 14:30",
       },
       {
         id: "msg-bamboo-08",
@@ -547,12 +756,11 @@ function jstToTimestamp(jstStr: string): Date {
   const [datePart, timePart] = jstStr.split(" ");
   const [year, month, day] = datePart.split("-").map(Number);
   const [hour, minute] = timePart.split(":").map(Number);
-  // JST は UTC+9 なので 9 時間引いて UTC Date を作成
   return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0));
 }
 
 async function seedDemoProjects() {
-  console.log("🚀 デモ用サンプルプロジェクトデータの投入を開始します...\n");
+  console.log("🚀 デモ用サンプルプロジェクトデータの追加投入を開始します...\n");
   const db = getAdminDb();
 
   for (const pj of DEMO_PROJECTS) {
@@ -577,13 +785,12 @@ async function seedDemoProjects() {
         { merge: true }
       );
 
-      // 2. メンバーの更新（指定の4名のみ、それ以外のサンプル学生は外す。ただしログイン中stromain等の運営アカウントは保持）
+      // 2. メンバーの更新（指定の4名のみ、それ以外のサンプル学生は外す）
       const membersColl = pDocRef.collection("members");
       const existingMembersSnap = await membersColl.get();
       const validUserIds = new Set(pj.members.map((m) => m.userId));
 
       for (const mDoc of existingMembersSnap.docs) {
-        // stromain または運営アカウントは保持
         if (mDoc.id.includes("stromain") || mDoc.data().isOwner) {
           continue;
         }
