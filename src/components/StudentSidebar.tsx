@@ -66,8 +66,11 @@ export default function StudentSidebar({
         });
         if (res.ok) {
           const data = await res.json();
-          if (active && Array.isArray(data.projects) && data.projects.length > 0) {
-            setProjects(data.projects);
+          if (active && Array.isArray(data.projects)) {
+            const mergedMap = new Map<string, ProjectSummaryItem>();
+            DEFAULT_PROJECTS.forEach((p) => mergedMap.set(p.id, p));
+            data.projects.forEach((p: ProjectSummaryItem) => mergedMap.set(p.id, p));
+            setProjects(Array.from(mergedMap.values()));
           }
         }
       } catch (err) {

@@ -18,11 +18,16 @@ export async function GET(request: Request) {
 
   try {
     const db = getAdminDb();
+    const userDoc = await db.collection("users").doc(authUser.uid).get();
+    const isAdmin = Boolean(userDoc.data()?.roles?.includes("admin"));
+
     let query = db.collection("project_applications").orderBy("createdAt", "desc");
 
     if (type === "received") {
-      // 自分が提唱しているプロジェクト宛ての応募
-      query = query.where("projectOwnerUid", "==", authUser.uid);
+      // 自分が提唱しているプロジェクト宛ての応募（管理者の場合は審査テスト用に全件閲覧可能）
+      if (!isAdmin) {
+        query = query.where("projectOwnerUid", "==", authUser.uid);
+      }
     } else {
       // 自分が応募した一覧
       query = query.where("applicantUid", "==", authUser.uid);
@@ -163,14 +168,16 @@ export async function PUT(request: Request) {
     const appRef = db.collection("project_applications").doc(applicationId);
     const appDoc = await appRef.get();
 
-    if (!appDoc.exists) {
+    const appData = appDoc.data();
+    if (!appDoc.exists || !appData) {
       return NextResponse.json({ error: "該当の応募が見つかりません。" }, { status: 404 });
     }
 
-    const appData = appDoc.data();
+    // 提唱者本人または管理者かどうか検証
+    const userDoc = await db.collection("users").doc(authUser.uid).get();
+    const isAdmin = Boolean(userDoc.data()?.roles?.includes("admin"));
 
-    // 提唱者本人かどうか検証
-    if (appData?.projectOwnerUid !== authUser.uid) {
+    if (appData?.projectOwnerUid !== authUser.uid && !isAdmin) {
       return NextResponse.json({ error: "この応募を承認・見送りする権限がありません。" }, { status: 403 });
     }
 

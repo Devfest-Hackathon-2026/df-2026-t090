@@ -1485,6 +1485,17 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setScoutTab("sent")}
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    scoutTab === "sent"
+                      ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
+                      : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
+                  }`}
+                >
+                  送った応募（応募履歴）
+                </button>
+                <button
+                  type="button"
                   onClick={() => setScoutTab("candidates")}
                   className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                     scoutTab === "candidates"
@@ -1493,17 +1504,6 @@ export default function Home() {
                   }`}
                 >
                   候補を探す（提唱者向け）
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScoutTab("sent")}
-                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                    scoutTab === "sent"
-                      ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
-                      : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
-                  }`}
-                >
-                  送ったスカウト
                 </button>
               </div>
 
@@ -1607,22 +1607,103 @@ export default function Home() {
                 </div>
               )}
 
+              {/* 送った応募（応募履歴）一覧 */}
+              {scoutTab === "sent" && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#7A5726]">
+                      あなたがこれまでに応募したプロジェクトの一覧と結果です:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={fetchApplications}
+                      className="text-xs text-[#B87503] hover:underline font-bold"
+                    >
+                      🔄 更新
+                    </button>
+                  </div>
+
+                  {loadingApps ? (
+                    <div className="py-12 text-center text-[#7A5726] font-bold">読み込み中...</div>
+                  ) : applications.length === 0 ? (
+                    <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-2">
+                      <span className="text-3xl">📤</span>
+                      <p className="text-sm font-bold text-[#3D2406]">まだ応募した履歴はありません。</p>
+                      <p className="text-xs text-[#7A5726]">
+                        ホーム画面から気になるプロジェクトの役割を選んで応募してみましょう！
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {applications.map((app) => (
+                        <div
+                          key={app.id}
+                          className="p-5 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left"
+                        >
+                          <div className="flex flex-col gap-1.5 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#F5B301] text-[#3D2406]">
+                                希望ロール: {app.roleName}
+                              </span>
+                              <span className="text-xs text-[#7A5726]">
+                                プロジェクト: <strong className="text-[#3D2406]">{app.projectTitle}</strong>
+                              </span>
+                            </div>
+
+                            {app.motivationMessage && (
+                              <p className="text-xs text-[#5C3D15] bg-[#FFFDF7] p-2.5 rounded-xl border border-[#B87503]/20 mt-1 leading-relaxed">
+                                あなたの応募メッセージ: {app.motivationMessage}
+                              </p>
+                            )}
+
+                            <span className="text-[10px] text-[#7A5726]">
+                              応募日時: {formatJSTDateTime(app.createdAt)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                app.status === "approved"
+                                  ? "bg-[#EDF7ED] text-[#1E4620] border border-[#81C784]"
+                                  : app.status === "rejected"
+                                  ? "bg-[#FDEAEA] text-[#5F1313] border border-[#E57373]"
+                                  : "bg-[#FFF8E1] text-[#B87503] border border-[#F5B301]"
+                              }`}
+                            >
+                              {app.status === "approved"
+                                ? "✓ 参加承認済み（メンバーに参加中）"
+                                : app.status === "rejected"
+                                ? "✕ 見送り（提唱者から見送られました）"
+                                : "⏳ 審査待ち（提唱者の返答待ち）"}
+                            </span>
+
+                            {app.status === "approved" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveNav(`workspace-${app.projectId}-chat`);
+                                  setRefreshSidebarTrigger((prev) => prev + 1);
+                                }}
+                                className="px-4 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-black shadow-xs hover:bg-[#E0A200]"
+                              >
+                                作業スペースへ移動 🚀
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {scoutTab === "candidates" && (
                 <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
                   <span className="text-3xl">🔍</span>
                   <h3 className="text-sm font-bold text-[#3D2406]">候補を探す（提唱者向け）</h3>
                   <p className="text-xs text-[#5C3D15] max-w-md">
                     プロジェクトが求めるスキルと合致する学生候補を匿名（「候補A」など）で検索し、月10件までスカウトメッセージを送ることができます。
-                  </p>
-                </div>
-              )}
-
-              {scoutTab === "sent" && (
-                <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
-                  <span className="text-3xl">📤</span>
-                  <h3 className="text-sm font-bold text-[#3D2406]">送ったスカウト</h3>
-                  <p className="text-xs text-[#5C3D15] max-w-md">
-                    これまでに送信したスカウトの一覧と、相手からの返事（受諾／見送り）ステータスを表示します。
                   </p>
                 </div>
               )}
