@@ -59,6 +59,14 @@ interface ProjectProgressAiResult {
   scoreWhy: string;
 }
 
+interface ProjectMemberResponseItem {
+  userId: string;
+  displayName: string;
+  schoolName: string;
+  roleName: string;
+  isFacilitator: boolean;
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -124,6 +132,10 @@ export default function Home() {
   const [handoverNoDataAlert, setHandoverNoDataAlert] = useState<string | null>(null);
   const [isSharingHandover, setIsSharingHandover] = useState<boolean>(false);
   const [handoverSharedSuccess, setHandoverSharedSuccess] = useState<string | null>(null);
+
+  // ──────── 参加メンバー動的取得用State ────────
+  const [projectMembers, setProjectMembers] = useState<ProjectMemberResponseItem[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
 
   // ──────── W03 スキルツリー用State ────────
   const [userBranches, setUserBranches] = useState<UserSkillBranch[]>([]);
@@ -436,6 +448,39 @@ export default function Home() {
       clearInterval(interval);
     };
   }, [activeNav, activeProjectId, activeChatRoomId, user]);
+
+  // ──────── プロジェクト参加メンバーの動的取得 ────────
+  useEffect(() => {
+    if (!activeNav.startsWith("workspace") || !activeProjectId || !user) {
+      return;
+    }
+
+    let active = true;
+    const loadMembers = async () => {
+      setLoadingMembers(true);
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/projects/${activeProjectId}/members`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) {
+            setProjectMembers(data.members || []);
+          }
+        }
+      } catch (err) {
+        console.error("メンバー取得エラー:", err);
+      } finally {
+        if (active) setLoadingMembers(false);
+      }
+    };
+
+    loadMembers();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, activeProjectId, user]);
 
   // ──────── W06 メッセージ送信 ────────
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -2132,50 +2177,54 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {[
-                      { id: "student-male-tanaka", name: "田中 健太", school: "東京農工大学 農学部", role: "発酵・醸造エンジニア", isFacil: false },
-                      { id: "student-female-sato", name: "佐藤 澪", school: "武蔵野美術大学 造形構想学部", role: "プロダクトデザイナー", isFacil: false },
-                      { id: "student-male-watanabe", name: "渡辺 航", school: "一橋大学 商学部", role: "ビジネスプランナー", isFacil: false },
-                      { id: "student-female-suzuki", name: "鈴木 結愛", school: "早稲田大学 基幹理工学部", role: "進行役・フロントエンド", isFacil: true },
-                      { id: "student-male-kobayashi", name: "小林 大地", school: "慶應義塾大学 看護医療学部", role: "医療調査（新メンバー・記録なし）", isFacil: false },
-                    ].map((m) => {
-                      const isLoadingThis = handoverLoadingUserId === m.id;
-                      return (
-                        <div key={m.id} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-[#3D2406]">{m.name}</span>
-                                {m.isFacil && (
-                                  <span className="px-1.5 py-0.2 rounded-md bg-[#F5B301] text-[#3D2406] text-[10px] font-bold">
-                                    進行役
-                                  </span>
-                                )}
+                  {loadingMembers ? (
+                    <div className="py-8 text-center text-xs text-[#7A5726] font-bold">
+                      メンバー情報を読み込み中...
+                    </div>
+                  ) : projectMembers.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 text-center text-xs text-[#7A5726] font-bold">
+                      メンバーはまだいません
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {projectMembers.map((m) => {
+                        const isLoadingThis = handoverLoadingUserId === m.userId;
+                        return (
+                          <div key={m.userId} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-[#3D2406]">{m.displayName}</span>
+                                  {m.isFacilitator && (
+                                    <span className="px-1.5 py-0.2 rounded-md bg-[#F5B301] text-[#3D2406] text-[10px] font-bold">
+                                      進行役
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-[#7A5726]">{m.schoolName}</span>
                               </div>
-                              <span className="text-[11px] text-[#7A5726]">{m.school}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
+                                {m.roleName}
+                              </span>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
-                              {m.role}
-                            </span>
-                          </div>
 
-                          <div className="flex items-center justify-between pt-1 border-t border-[#B87503]/10">
-                            <span className="text-[10px] text-[#7A5726]">引継ぎ支援</span>
-                            <button
-                              type="button"
-                              onClick={() => handleGenerateHandover(m.id, m.name, m.role)}
-                              disabled={Boolean(handoverLoadingUserId)}
-                              className="px-3 py-1 rounded-full bg-[#FFF8E1] border border-[#F5B301] text-[#3D2406] text-[11px] font-bold hover:bg-[#F5B301] shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
-                            >
-                              <span>🤖</span>
-                              <span>{isLoadingThis ? "要約生成中..." : "AI 引継ぎ要約"}</span>
-                            </button>
+                            <div className="flex items-center justify-between pt-1 border-t border-[#B87503]/10">
+                              <span className="text-[10px] text-[#7A5726]">引継ぎ支援</span>
+                              <button
+                                type="button"
+                                onClick={() => handleGenerateHandover(m.userId, m.displayName, m.roleName)}
+                                disabled={Boolean(handoverLoadingUserId)}
+                                className="px-3 py-1 rounded-full bg-[#FFF8E1] border border-[#F5B301] text-[#3D2406] text-[11px] font-bold hover:bg-[#F5B301] shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                              >
+                                <span>🤖</span>
+                                <span>{isLoadingThis ? "要約生成中..." : "AI 引継ぎ要約"}</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2187,7 +2236,7 @@ export default function Home() {
               <span className="text-3xl">🏆</span>
               <h2 className="text-lg font-bold text-[#3D2406]">活動記録の認定</h2>
               <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-                完了したプロジェクトの活動実績（何を話し合い、何を作ったか）が運営により認定され、あなたの公式実績としてPDFやQRコード付きで証明されます。
+                活動記録の認定は今後実装予定です。
               </p>
             </div>
           )}
