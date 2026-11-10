@@ -25,9 +25,9 @@ export default function AnnouncementsPage() {
 
       <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
         <span className="text-4xl">✉️</span>
-        <h2 className="text-lg font-bold text-[#3D2406]">第5段階でお知らせ配信機能を実装します</h2>
+        <h2 className="text-lg font-bold text-[#3D2406]">今後実装予定</h2>
         <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-          入力フォーム（件名・本文・配信先・届け方）、プレビュー表示、予約、および全員宛て配信時の運営2人確認ワークフローを構築します。
+          今後のアップデートにおいて、入力フォーム（件名・本文・配信先・届け方）、プレビュー表示、予約、および全員宛て配信時の運営2人確認ワークフローを構築します。
         </p>
       </div>
     </div>

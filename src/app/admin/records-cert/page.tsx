@@ -25,9 +25,9 @@ export default function RecordsCertPage() {
 
       <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
         <span className="text-4xl">📜</span>
-        <h2 className="text-lg font-bold text-[#3D2406]">第5段階で認定管理機能を実装します</h2>
+        <h2 className="text-lg font-bold text-[#3D2406]">今後実装予定</h2>
         <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-          第5段階の実装フェーズにおいて、終了プロジェクト一覧、成果物確認、メンバーごとの認定／保留切り替えアクションを構築します。
+          今後のアップデートにおいて、終了プロジェクト一覧、成果物確認、メンバーごとの認定／保留切り替えアクションを構築します。
         </p>
       </div>
     </div>

@@ -108,10 +108,22 @@ export default function Home() {
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>("general");
   const [workspaceSubTab, setWorkspaceSubTab] = useState<"chat" | "files" | "calendar" | "members">("chat");
 
-  // ──────── W06 AIプロジェクト進行度測定State ────────
+  // ──────── AIプロジェクト進行度測定State ────────
   const [progressAiResult, setProgressAiResult] = useState<ProjectProgressAiResult | null>(null);
   const [isAnalyzingProgress, setIsAnalyzingProgress] = useState<boolean>(false);
   const [progressAiError, setProgressAiError] = useState<string | null>(null);
+
+  // ──────── AI引継ぎ要約用State ────────
+  const [handoverModalOpen, setHandoverModalOpen] = useState<boolean>(false);
+  const [handoverLoadingUserId, setHandoverLoadingUserId] = useState<string | null>(null);
+  const [handoverTargetName, setHandoverTargetName] = useState<string>("");
+  const [handoverTargetRole, setHandoverTargetRole] = useState<string>("");
+  const [handoverStatusText, setHandoverStatusText] = useState<string>("");
+  const [handoverDecisionsText, setHandoverDecisionsText] = useState<string>("");
+  const [handoverTasksText, setHandoverTasksText] = useState<string>("");
+  const [handoverNoDataAlert, setHandoverNoDataAlert] = useState<string | null>(null);
+  const [isSharingHandover, setIsSharingHandover] = useState<boolean>(false);
+  const [handoverSharedSuccess, setHandoverSharedSuccess] = useState<string | null>(null);
 
   // ──────── W03 スキルツリー用State ────────
   const [userBranches, setUserBranches] = useState<UserSkillBranch[]>([]);
@@ -507,6 +519,98 @@ export default function Home() {
       setProgressAiError("通信エラーが発生しました。");
     } finally {
       setIsAnalyzingProgress(false);
+    }
+  };
+
+  // ──────── AIによる引継ぎ要約の生成 ────────
+  const handleGenerateHandover = async (userId: string, userName: string, roleName: string) => {
+    if (!user || !activeProjectId) return;
+    setHandoverLoadingUserId(userId);
+    setHandoverNoDataAlert(null);
+    setHandoverSharedSuccess(null);
+    setHandoverTargetRole(roleName);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/handover-ai`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.noData) {
+          setHandoverNoDataAlert(`${userName} さんについて要約に使える記録がまだありません。`);
+        } else {
+          alert(data.error || "引継ぎ要約の生成に失敗しました。");
+        }
+        return;
+      }
+
+      const r = data.result;
+      setHandoverTargetName(r.targetUserName);
+      setHandoverTargetRole(r.targetUserRole);
+      setHandoverStatusText(r.currentStatus);
+      setHandoverDecisionsText(
+        r.decisions.map((d: { content: string; reference: string }) => `・${d.content}（参照: ${d.reference}）`).join("\n")
+      );
+      setHandoverTasksText(
+        r.remainingTasks
+          .map(
+            (t: { task: string; deadline: string; note?: string }) =>
+              `・${t.task}（目安締切: ${t.deadline}${t.note ? ` / 留意: ${t.note}` : ""}）`
+          )
+          .join("\n")
+      );
+      setHandoverModalOpen(true);
+    } catch {
+      alert("通信エラーが発生しました。");
+    } finally {
+      setHandoverLoadingUserId(null);
+    }
+  };
+
+  // ──────── 進行役による引継ぎメモのチャット共有 ────────
+  const handleShareHandoverToChat = async () => {
+    if (!user || !activeProjectId) return;
+    setIsSharingHandover(true);
+
+    try {
+      const token = await user.getIdToken();
+      const summaryText = `【メンバー引継ぎメモ: ${handoverTargetName} (${handoverTargetRole})】\n\n■ 1. 現在地\n${handoverStatusText}\n\n■ 2. 決まったこと\n${handoverDecisionsText}\n\n■ 3. 残りの作業と締切\n${handoverTasksText}`;
+
+      const res = await fetch(`/api/student/projects/${activeProjectId}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          roomId: "general",
+          text: summaryText,
+          isAnnouncement: true, // 全体連絡として重要固定
+          deadline: "2026-11-20",
+        }),
+      });
+
+      if (res.ok) {
+        setHandoverSharedSuccess("引継ぎメモをチャットの全体連絡として共有しました！");
+        fetchChatMessages();
+        setTimeout(() => {
+          setHandoverModalOpen(false);
+          setHandoverSharedSuccess(null);
+        }, 1500);
+      } else {
+        alert("共有に失敗しました。");
+      }
+    } catch {
+      alert("通信エラーが発生しました。");
+    } finally {
+      setIsSharingHandover(false);
     }
   };
 
@@ -2007,33 +2111,70 @@ export default function Home() {
               {workspaceSubTab === "members" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#3D2406]">参加メンバーと役割一覧</span>
+                    <div>
+                      <span className="font-bold text-xs sm:text-sm text-[#3D2406] block">参加メンバーと役割一覧</span>
+                      <span className="text-[11px] text-[#7A5726]">
+                        メンバーの交代や一時離脱の際は「AI 引継ぎ要約」でスムーズに後任へ申し送りできます。
+                      </span>
+                    </div>
                   </div>
+
+                  {handoverNoDataAlert && (
+                    <div className="p-3.5 rounded-2xl bg-[#FFF8E1] border-2 border-[#F5B301] text-[#7A5726] text-xs font-bold flex items-center justify-between">
+                      <span>⚠ {handoverNoDataAlert}</span>
+                      <button
+                        type="button"
+                        onClick={() => setHandoverNoDataAlert(null)}
+                        className="text-xs text-[#3D2406]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     {[
-                      { name: "田中 健太", school: "東京農工大学 農学部", role: "発酵・醸造エンジニア", isFacil: false },
-                      { name: "鈴木 結愛", school: "早稲田大学 基幹理工学部", role: "進行役・フロントエンド", isFacil: true },
-                      { name: "佐藤 澪", school: "武蔵野美術大学 造形構想学部", role: "プロダクトデザイナー", isFacil: false },
-                      { name: "渡辺 航", school: "一橋大学 商学部", role: "ビジネスプランナー", isFacil: false },
-                    ].map((m, i) => (
-                      <div key={i} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-[#3D2406]">{m.name}</span>
-                            {m.isFacil && (
-                              <span className="px-1.5 py-0.2 rounded-md bg-[#F5B301] text-[#3D2406] text-[10px] font-bold">
-                                進行役
-                              </span>
-                            )}
+                      { id: "student-male-tanaka", name: "田中 健太", school: "東京農工大学 農学部", role: "発酵・醸造エンジニア", isFacil: false },
+                      { id: "student-female-sato", name: "佐藤 澪", school: "武蔵野美術大学 造形構想学部", role: "プロダクトデザイナー", isFacil: false },
+                      { id: "student-male-watanabe", name: "渡辺 航", school: "一橋大学 商学部", role: "ビジネスプランナー", isFacil: false },
+                      { id: "student-female-suzuki", name: "鈴木 結愛", school: "早稲田大学 基幹理工学部", role: "進行役・フロントエンド", isFacil: true },
+                      { id: "student-male-kobayashi", name: "小林 大地", school: "慶應義塾大学 看護医療学部", role: "医療調査（新メンバー・記録なし）", isFacil: false },
+                    ].map((m) => {
+                      const isLoadingThis = handoverLoadingUserId === m.id;
+                      return (
+                        <div key={m.id} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-[#3D2406]">{m.name}</span>
+                                {m.isFacil && (
+                                  <span className="px-1.5 py-0.2 rounded-md bg-[#F5B301] text-[#3D2406] text-[10px] font-bold">
+                                    進行役
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-[#7A5726]">{m.school}</span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
+                              {m.role}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-[#7A5726]">{m.school}</span>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-[#B87503]/10">
+                            <span className="text-[10px] text-[#7A5726]">引継ぎ支援</span>
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateHandover(m.id, m.name, m.role)}
+                              disabled={Boolean(handoverLoadingUserId)}
+                              className="px-3 py-1 rounded-full bg-[#FFF8E1] border border-[#F5B301] text-[#3D2406] text-[11px] font-bold hover:bg-[#F5B301] shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                            >
+                              <span>🤖</span>
+                              <span>{isLoadingThis ? "要約生成中..." : "AI 引継ぎ要約"}</span>
+                            </button>
+                          </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
-                          {m.role}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -2053,7 +2194,7 @@ export default function Home() {
         </main>
       </div>
 
-      {/* ──────── 応募モーダル（W02） ──────── */}
+      {/* ──────── 応募モーダル ──────── */}
       {applyModalOpen && selectedIdea && selectedRoleForApply && (
         <div className="fixed inset-0 z-50 bg-[#3D2406]/50 backdrop-blur-xs flex items-center justify-center p-4">
           <form
@@ -2123,6 +2264,99 @@ export default function Home() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ──────── AI 引継ぎ要約（進行役の手直し ＆ 共有モーダル） ──────── */}
+      {handoverModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#3D2406]/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FFFBEB] max-w-xl w-full rounded-3xl p-6 border-2 border-[#F5B301] shadow-2xl flex flex-col gap-4 text-left max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-2">
+              <div>
+                <h3 className="text-base font-black text-[#3D2406] flex items-center gap-1.5">
+                  <span>🤖</span>
+                  <span>AI 引継ぎ要約（進行役の確認・編集）</span>
+                </h3>
+                <span className="text-xs text-[#7A5726]">
+                  対象: <strong>{handoverTargetName}</strong>（{handoverTargetRole}）
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHandoverModalOpen(false)}
+                className="text-xs font-bold text-[#7A5726]"
+              >
+                ✕ 閉じる
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#5C3D15] bg-[#FFF8E1] p-2.5 rounded-xl border border-[#F5B301]/40">
+              ※ Gemini がチャット発言とタスク履歴から自動抽出しました。進行役が内容を確かめ、必要に応じて加筆・修正した上でチームに共有できます。
+            </p>
+
+            {/* 1. 現在地 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-black text-[#3D2406]">
+                1. 現在地（到達点・進捗状況）:
+              </label>
+              <textarea
+                rows={3}
+                value={handoverStatusText}
+                onChange={(e) => setHandoverStatusText(e.target.value)}
+                className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406] leading-relaxed focus:outline-none focus:border-[#F5B301]"
+              />
+            </div>
+
+            {/* 2. 決まったこと */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-black text-[#3D2406]">
+                2. 決まったこと（元の発言やファイルへのリンク・参照付き）:
+              </label>
+              <textarea
+                rows={4}
+                value={handoverDecisionsText}
+                onChange={(e) => setHandoverDecisionsText(e.target.value)}
+                className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406] leading-relaxed focus:outline-none focus:border-[#F5B301]"
+              />
+            </div>
+
+            {/* 3. 残りの作業と締切 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-black text-[#3D2406]">
+                3. 残りの作業と締切（後任への申し送り事項）:
+              </label>
+              <textarea
+                rows={4}
+                value={handoverTasksText}
+                onChange={(e) => setHandoverTasksText(e.target.value)}
+                className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406] leading-relaxed focus:outline-none focus:border-[#F5B301]"
+              />
+            </div>
+
+            {handoverSharedSuccess && (
+              <div className="p-3 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs font-bold">
+                ✓ {handoverSharedSuccess}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#B87503]/20">
+              <button
+                type="button"
+                onClick={() => setHandoverModalOpen(false)}
+                className="px-4 py-2 rounded-full border border-[#B87503]/40 bg-[#FFFDF7] text-[#5C3D15] text-xs font-bold"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleShareHandoverToChat}
+                disabled={isSharingHandover}
+                className="px-5 py-2 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-black hover:bg-[#E0A200] shadow-xs disabled:opacity-50"
+              >
+                {isSharingHandover ? "共有中..." : "直した内容をチャットに全体共有する 📢"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
