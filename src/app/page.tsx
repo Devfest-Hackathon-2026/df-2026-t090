@@ -1795,9 +1795,32 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">💬</span>
                   <div>
-                    <h2 className="text-base sm:text-lg font-black text-[#3D2406]">
-                      プロジェクト作業画面
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-[#3D2406]">
+                        {activeProjectId === "demo-idea-craft-beer"
+                          ? "地域伝統クラフトビール開発"
+                          : activeProjectId === "demo-idea-campus-map"
+                          ? "学内空き教室リアルタイム共有"
+                          : activeProjectId === "demo-completed-pj" || activeProjectId === "demo-idea-bamboo-lamp"
+                          ? "放置竹林サステナブル照明 (第1期)"
+                          : "プロジェクト作業画面"}
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/40 text-[#B87503] text-[10px] font-bold">
+                        サンプルデータ
+                      </span>
+                    </div>
+
+                    {/* 進み具合（段階ごとの状態） */}
+                    <p className="text-[11px] text-[#5C3D15] mt-0.5">
+                      <span className="font-bold text-[#3D2406]">進み具合: </span>
+                      {activeProjectId === "demo-idea-craft-beer" &&
+                        "コンセプトの決定と利用者の調査【完了】／醸造所との試作レシピの調整と試醸【進行中】／ラベルデザインの決定と試飲イベントの企画【未着手】"}
+                      {activeProjectId === "demo-idea-campus-map" &&
+                        "要件定義と画面設計【完了】／データベースの設計と API の実装【進行中】／学内での実証テストと導入【未着手】"}
+                      {(activeProjectId === "demo-completed-pj" || activeProjectId === "demo-idea-bamboo-lamp") &&
+                        "竹の調達・加工方法と構造の設計【完了】／回路の設計・加工・使いやすさの評価【完了】／試作品の完成と展示での意見集め【完了】"}
+                    </p>
+
                     <span className="text-xs text-[#7A5726]">
                       共創チーム作業スペース（チャット / ファイル / 空き時間 / メンバー）
                     </span>
