@@ -189,3 +189,68 @@ export interface PendingConfirmation {
   confirmedAt?: string;
   confirmationNote?: string;
 }
+
+// 応募（W02 応募受付 & W04 届いた応募）
+export type ApplicationStatus = "pending" | "approved" | "rejected";
+
+export interface ProjectApplication {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  projectOwnerUid: string;
+  roleId: string;
+  roleName: string;
+  applicantUid: string;
+  applicantName: string;
+  applicantSchool: string;
+  applicantFaculty?: string;
+  applicantGrade?: string;
+  motivationMessage: string; // 応募動機・メッセージ
+  status: ApplicationStatus;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+// プロジェクト参加メンバー（W09 メンバーと役割）
+export type MemberParticipationType = "job" | "membership";
+export type MemberStatus = "active" | "leaving";
+
+export interface ProjectMember {
+  userId: string;
+  displayName: string;
+  schoolName: string;
+  roleName: string;
+  isOwner: boolean;
+  isFacilitator: boolean; // 進行役
+  participationType: MemberParticipationType;
+  status: MemberStatus;
+  joinedAt: string;
+  leavingDate?: string;
+}
+
+// チャットメッセージ ＆ 全体連絡（W06 チャット）
+export interface ProjectMessage {
+  id: string;
+  projectId: string;
+  roomId: string;          // "general" または タスクID
+  senderUid: string;
+  senderName: string;
+  senderSchool: string;
+  senderRole: string;
+  text: string;
+  isAnnouncement: boolean; // 進行役が出す「全体連絡」かどうか
+  deadline?: string;       // 全体連絡の確認期限（例: "2026-11-12 23:59"）
+  confirmedUserUids: string[]; // 「確認しました」を押したメンバーのUID配列
+  totalMembersCount?: number;  // 確認対象人数（例: 6人中3人）
+  createdAt: string;
+}
+
+// チャットルーム
+export interface ChatRoom {
+  id: string;
+  name: string;
+  type: "general" | "task";
+  unreadCount: number;
+  hasUnconfirmedAnnouncement: boolean; // 未確認の全体連絡があるか
+}
+

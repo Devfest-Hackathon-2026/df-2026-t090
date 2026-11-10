@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { User } from "firebase/auth";
 import { UserProfile } from "@/lib/types/hive";
@@ -12,7 +13,33 @@ interface StudentSidebarProps {
   onSelectNav: (navId: string) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
+  refreshTrigger?: number; // 応募承認などで参加プロジェクトが更新された場合のトリガー
 }
+
+interface ProjectSummaryItem {
+  id: string;
+  name: string;
+  isCompleted: boolean;
+  isOwner?: boolean;
+}
+
+const DEFAULT_PROJECTS: ProjectSummaryItem[] = [
+  {
+    id: "demo-idea-craft-beer",
+    name: "地域伝統クラフトビール開発",
+    isCompleted: false,
+  },
+  {
+    id: "demo-idea-campus-map",
+    name: "学内空き教室リアルタイム共有",
+    isCompleted: false,
+  },
+  {
+    id: "demo-completed-pj",
+    name: "放置竹林サステナブル照明 (第1期)",
+    isCompleted: true,
+  },
+];
 
 export default function StudentSidebar({
   user,
@@ -22,25 +49,37 @@ export default function StudentSidebar({
   onSelectNav,
   isOpenMobile = false,
   onCloseMobile,
+  refreshTrigger = 0,
 }: StudentSidebarProps) {
-  // デモ用の参加中プロジェクトデータ（仕様: 終了したものは「(終了)」を付けて薄く表示）
-  const activeProjects = [
-    {
-      id: "demo-idea-craft-beer",
-      name: "地域伝統クラフトビール開発",
-      isCompleted: false,
-    },
-    {
-      id: "demo-idea-campus-map",
-      name: "学内空き教室リアルタイム共有",
-      isCompleted: false,
-    },
-    {
-      id: "demo-completed-pj",
-      name: "放置竹林サステナブル照明 (第1期)",
-      isCompleted: true, // 終了済み
-    },
-  ];
+  const [projects, setProjects] = useState<ProjectSummaryItem[]>(DEFAULT_PROJECTS);
+
+  // 参加中プロジェクトの動的取得
+  useEffect(() => {
+    if (!user) return;
+
+    let active = true;
+    const fetchMyProjects = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch("/api/student/my-projects", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active && Array.isArray(data.projects) && data.projects.length > 0) {
+            setProjects(data.projects);
+          }
+        }
+      } catch (err) {
+        console.error("参加プロジェクト取得エラー:", err);
+      }
+    };
+
+    fetchMyProjects();
+    return () => {
+      active = false;
+    };
+  }, [user, refreshTrigger]);
 
   const mainMenuItems = [
     { id: "home", label: "ホーム（合うプロジェクト）", icon: "🏠", badge: null },
@@ -147,7 +186,7 @@ export default function StudentSidebar({
           <div className="flex flex-col gap-2 pt-2 border-t border-[#B87503]/20">
             <span className="text-[11px] font-bold text-[#7A5726] px-2">参加中のプロジェクト</span>
             <div className="flex flex-col gap-3">
-              {activeProjects.map((pj) => (
+              {projects.map((pj) => (
                 <div
                   key={pj.id}
                   className={`p-2.5 rounded-2xl border transition-colors ${
