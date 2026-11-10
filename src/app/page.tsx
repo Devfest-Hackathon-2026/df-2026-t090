@@ -5,6 +5,7 @@ import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/aut
 import { auth, googleProvider } from "@/lib/firebase";
 import { FILTER_FIELDS, FilterField } from "@/lib/constants";
 import { UserProfile, ProjectApplication, ProjectMessage, UserSkillBranch } from "@/lib/types/hive";
+import { ProjectTaskItem, TaskStatus } from "@/app/api/student/projects/[id]/tasks/route";
 import { formatJSTDateTime } from "@/lib/theme";
 import StudentSidebar from "@/components/StudentSidebar";
 import OnboardingModal from "@/components/OnboardingModal";
@@ -69,7 +70,7 @@ interface ProjectMemberResponseItem {
 
 function parseWorkspaceNav(nav: string): {
   projectId: string | null;
-  subTab: "chat" | "files" | "calendar" | "members";
+  subTab: "chat" | "tasks" | "files" | "calendar" | "members";
 } {
   if (!nav.startsWith("workspace-")) {
     return { projectId: null, subTab: "chat" };
@@ -77,6 +78,9 @@ function parseWorkspaceNav(nav: string): {
   const raw = nav.slice("workspace-".length);
   if (raw.endsWith("-chat")) {
     return { projectId: raw.slice(0, -"-chat".length), subTab: "chat" };
+  }
+  if (raw.endsWith("-tasks")) {
+    return { projectId: raw.slice(0, -"-tasks".length), subTab: "tasks" };
   }
   if (raw.endsWith("-files")) {
     return { projectId: raw.slice(0, -"-files".length), subTab: "files" };
@@ -138,7 +142,17 @@ export default function Home() {
   const [chatIsAnnouncement, setChatIsAnnouncement] = useState<boolean>(false);
   const [chatDeadline, setChatDeadline] = useState<string>("");
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>("general");
-  const [workspaceSubTab, setWorkspaceSubTab] = useState<"chat" | "files" | "calendar" | "members">("chat");
+  const [workspaceSubTab, setWorkspaceSubTab] = useState<"chat" | "tasks" | "files" | "calendar" | "members">("chat");
+
+  // ──────── タスク管理用State ────────
+  const [projectTasks, setProjectTasks] = useState<ProjectTaskItem[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState<boolean>(false);
+  const [taskCreateModalOpen, setTaskCreateModalOpen] = useState<boolean>(false);
+  const [taskTitleInput, setTaskTitleInput] = useState<string>("");
+  const [taskAssigneeUid, setTaskAssigneeUid] = useState<string>("");
+  const [taskDeadlineInput, setTaskDeadlineInput] = useState<string>("");
+  const [taskOriginalMsgId, setTaskOriginalMsgId] = useState<string | null>(null);
+  const [isCreatingTask, setIsCreatingTask] = useState<boolean>(false);
 
   // ──────── AIプロジェクト進行度測定State ────────
   const [progressAiResult, setProgressAiResult] = useState<ProjectProgressAiResult | null>(null);
@@ -547,6 +561,120 @@ export default function Home() {
       active = false;
     };
   }, [activeNav, activeProjectId, user]);
+
+  // ──────── タスク一覧の動的取得 ────────
+  const fetchTasks = useCallback(async () => {
+    if (!activeProjectId || !user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/tasks`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProjectTasks(data.tasks || []);
+      }
+    } catch (err) {
+      console.error("タスク取得エラー:", err);
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [activeProjectId, user]);
+
+  useEffect(() => {
+    if (!activeNav.startsWith("workspace") || !activeProjectId || !user) return;
+    let active = true;
+
+    const loadTasks = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/projects/${activeProjectId}/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setProjectTasks(data.tasks || []);
+        }
+      } catch (err) {
+        console.error("タスク取得エラー:", err);
+      } finally {
+        if (active) setLoadingTasks(false);
+      }
+    };
+
+    loadTasks();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, activeProjectId, user]);
+
+  // ──────── 発言からタスク作成モーダルを開く ────────
+  const handleOpenTaskCreate = (msgText: string, msgId: string) => {
+    setTaskTitleInput(msgText.slice(0, 100));
+    setTaskOriginalMsgId(msgId);
+    setTaskAssigneeUid(projectMembers[0]?.userId || user?.uid || "");
+    setTaskDeadlineInput("");
+    setTaskCreateModalOpen(true);
+  };
+
+  // ──────── タスクの新規作成 ────────
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !activeProjectId || !taskTitleInput.trim()) return;
+    setIsCreatingTask(true);
+
+    try {
+      const token = await user.getIdToken();
+      const targetMember = projectMembers.find((m) => m.userId === taskAssigneeUid);
+      const res = await fetch(`/api/student/projects/${activeProjectId}/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: taskTitleInput.trim(),
+          assigneeUid: taskAssigneeUid,
+          assigneeName: targetMember?.displayName || user.displayName || "メンバー",
+          deadline: taskDeadlineInput,
+          originalMessageId: taskOriginalMsgId,
+        }),
+      });
+
+      if (res.ok) {
+        setTaskCreateModalOpen(false);
+        setTaskTitleInput("");
+        fetchTasks();
+      } else {
+        alert("タスク作成に失敗しました。");
+      }
+    } catch {
+      alert("通信エラーが発生しました。");
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
+
+  // ──────── タスク状態の更新（未着手・進行中・完了） ────────
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+    if (!user || !activeProjectId) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/tasks`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ taskId, status: newStatus }),
+      });
+      if (res.ok) {
+        fetchTasks();
+      }
+    } catch {
+      alert("タスク状態の更新に失敗しました。");
+    }
+  };
 
   // ──────── W06 メッセージ送信 ────────
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -1991,10 +2119,11 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* サブタブ（チャット、ファイル、予定空き時間、メンバー） */}
-              <div className="flex items-center gap-2 border-b border-[#B87503]/20 pb-2">
+              {/* サブタブ（チャット、タスク、ファイル、予定空き時間、メンバー） */}
+              <div className="flex items-center gap-2 border-b border-[#B87503]/20 pb-2 overflow-x-auto no-scrollbar">
                 {[
                   { id: "chat", label: "💬 チャット" },
+                  { id: "tasks", label: "📋 タスク一覧" },
                   { id: "files", label: "📁 共有ファイル" },
                   { id: "calendar", label: "📅 空き時間重ね合わせ" },
                   { id: "members", label: "👥 メンバー一覧" },
@@ -2003,14 +2132,14 @@ export default function Home() {
                     key={tab.id}
                     type="button"
                     onClick={() => {
-                      const nextTab = tab.id as "chat" | "files" | "calendar" | "members";
+                      const nextTab = tab.id as "chat" | "tasks" | "files" | "calendar" | "members";
                       setWorkspaceSubTab(nextTab);
                       if (activeProjectId) {
                         const navSuffix = nextTab === "calendar" ? "schedule" : nextTab;
                         setActiveNav(`workspace-${activeProjectId}-${navSuffix}`);
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                       currentSubTab === tab.id
                         ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
                         : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
@@ -2203,6 +2332,16 @@ export default function Home() {
                             >
                               {msg.text}
                             </div>
+
+                            {/* 発言からタスク作成ボタン */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenTaskCreate(msg.text, msg.id)}
+                              className="text-[10px] text-[#B87503] hover:underline font-bold flex items-center gap-0.5 bg-[#FFF8E1] px-2 py-0.5 rounded-full border border-[#B87503]/25 self-start transition-colors cursor-pointer"
+                            >
+                              <span>📌</span>
+                              <span>タスクにする</span>
+                            </button>
                           </div>
                         );
                       })
@@ -2261,6 +2400,87 @@ export default function Home() {
                     </div>
                   </form>
                 </>
+              )}
+
+              {/* 📋 タスク一覧サブタブ */}
+              {currentSubTab === "tasks" && (
+                <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-xs sm:text-sm text-[#3D2406] block">プロジェクトのタスク一覧</span>
+                      <span className="text-[11px] text-[#7A5726]">
+                        チャットの各発言にある「📌 タスクにする」からタスクを追加・割り当てできます。
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTaskTitleInput("");
+                        setTaskOriginalMsgId(null);
+                        setTaskAssigneeUid(projectMembers[0]?.userId || user?.uid || "");
+                        setTaskDeadlineInput("");
+                        setTaskCreateModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs cursor-pointer"
+                    >
+                      ＋ 新しいタスク
+                    </button>
+                  </div>
+
+                  {loadingTasks ? (
+                    <div className="py-8 text-center text-xs text-[#7A5726] font-bold">
+                      タスクを読み込み中...
+                    </div>
+                  ) : projectTasks.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 text-center text-xs text-[#7A5726] font-bold">
+                      まだタスクはありません。チャットの発言から「📌 タスクにする」を押して作成しましょう！
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {projectTasks.map((t) => {
+                        const isDone = t.status === "completed";
+                        return (
+                          <div
+                            key={t.id}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left ${
+                              isDone
+                                ? "bg-[#EDF7ED]/60 border-[#81C784]/40 opacity-75"
+                                : t.status === "in_progress"
+                                ? "bg-[#FFF8E1] border-[#F5B301]"
+                                : "bg-[#FFFDF7] border-[#B87503]/20"
+                            }`}
+                          >
+                            <div className="flex flex-col gap-1 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold text-[#3D2406] ${isDone ? "line-through text-[#7A5726]" : ""}`}>
+                                  {t.title}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-[#7A5726]">
+                                <span>担当: <strong className="text-[#3D2406]">{t.assigneeName}</strong></span>
+                                {t.deadline && <span>期限: <strong className="text-[#B87503]">{t.deadline}</strong></span>}
+                              </div>
+                            </div>
+
+                            {/* 状態変更セレクトボックス */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] text-[#7A5726] font-bold">状態:</span>
+                              <select
+                                value={t.status}
+                                onChange={(e) => handleUpdateTaskStatus(t.id, e.target.value as TaskStatus)}
+                                className="bg-white border border-[#B87503]/30 rounded-xl px-2.5 py-1 text-xs font-bold text-[#3D2406]"
+                              >
+                                <option value="not_started">未着手</option>
+                                <option value="in_progress">進行中</option>
+                                <option value="completed">完了 ✓</option>
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* 共有ファイルサブタブ */}
@@ -2580,6 +2800,91 @@ export default function Home() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ──────── タスク作成モーダル ──────── */}
+      {taskCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#3D2406]/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateTask}
+            className="bg-[#FFFBEB] max-w-md w-full rounded-3xl p-6 border-2 border-[#B87503] shadow-2xl flex flex-col gap-4 text-left"
+          >
+            <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-2">
+              <h3 className="text-base font-black text-[#3D2406] flex items-center gap-1.5">
+                <span>📌</span>
+                <span>発言からタスクを作成</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTaskCreateModalOpen(false)}
+                className="text-xs font-bold text-[#7A5726]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-[#3D2406]">
+                タスクの内容 <span className="text-[#B87503]">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={taskTitleInput}
+                onChange={(e) => setTaskTitleInput(e.target.value)}
+                className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406] focus:outline-none focus:border-[#F5B301]"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="font-bold text-[#3D2406] block mb-1">
+                  担当者 <span className="text-[#B87503]">*</span>
+                </label>
+                <select
+                  value={taskAssigneeUid}
+                  onChange={(e) => setTaskAssigneeUid(e.target.value)}
+                  className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-2.5 py-2 font-bold text-[#3D2406]"
+                >
+                  {projectMembers.map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      {m.displayName} ({m.roleName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-[#3D2406] block mb-1">
+                  期限
+                </label>
+                <input
+                  type="date"
+                  value={taskDeadlineInput}
+                  onChange={(e) => setTaskDeadlineInput(e.target.value)}
+                  className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-2.5 py-1.5 text-xs text-[#3D2406]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#B87503]/20">
+              <button
+                type="button"
+                onClick={() => setTaskCreateModalOpen(false)}
+                className="px-4 py-2 rounded-full border border-[#B87503]/40 bg-[#FFFDF7] text-[#5C3D15] text-xs font-bold"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={isCreatingTask}
+                className="px-5 py-2 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-black hover:bg-[#E0A200] shadow-xs disabled:opacity-50"
+              >
+                {isCreatingTask ? "作成中..." : "タスクを作成 🚀"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
