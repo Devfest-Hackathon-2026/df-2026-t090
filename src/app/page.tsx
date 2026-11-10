@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { FILTER_FIELDS, FilterField } from "@/lib/constants";
-import { UserProfile, ProjectApplication, ProjectMessage, UserSkillBranch } from "@/lib/types/hive";
+import { UserProfile, ProjectApplication, ProjectMessage, UserSkillBranch, MemberEvaluation, EvaluationSummary } from "@/lib/types/hive";
 import { ProjectTaskItem, TaskStatus } from "@/app/api/student/projects/[id]/tasks/route";
 import { ProjectFileItem } from "@/app/api/student/projects/[id]/files/route";
 import { formatJSTDateTime } from "@/lib/theme";
@@ -146,6 +146,11 @@ export default function Home() {
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>("general");
   const [workspaceSubTab, setWorkspaceSubTab] = useState<"chat" | "tasks" | "files" | "calendar" | "members">("chat");
 
+  // ──────── プロジェクトIDおよびサブタブの正確なパース ────────
+  const parsedWorkspace = parseWorkspaceNav(activeNav);
+  const activeProjectId = parsedWorkspace.projectId;
+  const currentSubTab = parsedWorkspace.subTab || workspaceSubTab || "chat";
+
   // ──────── タスク管理用State ────────
   const [projectTasks, setProjectTasks] = useState<ProjectTaskItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState<boolean>(false);
@@ -219,6 +224,61 @@ export default function Home() {
   const [submitTab, setSubmitTab] = useState<"skill" | "project">("skill");
   const [submitSuccessMessage, setSubmitSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // ──────── 相互評価用State ────────
+  const [evalModalOpen, setEvalModalOpen] = useState<boolean>(false);
+  const [evalTargetMember, setEvalTargetMember] = useState<ProjectMemberResponseItem | null>(null);
+  const [evalScores, setEvalScores] = useState<{ contribution: number; trust: number; cooperation: number; sharing: number }>({
+    contribution: 5,
+    trust: 5,
+    cooperation: 5,
+    sharing: 5,
+  });
+  const [evalComment, setEvalComment] = useState<string>("");
+  const [isSubmittingEval, setIsSubmittingEval] = useState<boolean>(false);
+  const [evalSuccessMessage, setEvalSuccessMessage] = useState<string | null>(null);
+  const [mySentEvals, setMySentEvals] = useState<MemberEvaluation[]>([]);
+  const [memberSummaries, setMemberSummaries] = useState<Record<string, { averageOverall: number; count: number }>>({});
+  const [myEvalSummary, setMyEvalSummary] = useState<EvaluationSummary | null>(null);
+
+  // 現在のプロジェクトが完了・終了しているか判定
+  const isCurrentProjectCompleted = useMemo(() => {
+    if (!activeProjectId) return false;
+    return activeProjectId === "demo-completed-pj" || activeProjectId.includes("completed");
+  }, [activeProjectId]);
+
+  // 星評価の文字列表現ヘルパー（例: ★★★★☆）
+  const renderStars = (rating: number) => {
+    const rounded = Math.round(rating);
+    return "★".repeat(Math.max(0, Math.min(5, rounded))) + "☆".repeat(Math.max(0, Math.min(5, 5 - rounded)));
+  };
+
+  // プロフィール表示用: 関わったプロジェクト一覧
+  const participatedProjects = useMemo(() => {
+    return [
+      {
+        id: "demo-completed-pj",
+        title: "放置竹林サステナブル照明 (第1期)",
+        roleName: profile?.mainRole || "ハードウェア回路・センサ選定",
+        period: "2026年4月 〜 2026年8月",
+        status: "完了",
+      },
+      {
+        id: "demo-idea-craft-beer",
+        title: "地域伝統クラフトビール開発",
+        roleName: "醸造データ解析・発酵プロセス管理",
+        period: "2026年9月 〜 進行中",
+        status: "進行中",
+      },
+      {
+        id: "demo-idea-campus-map",
+        title: "学内空き教室リアルタイム共有",
+        roleName: "フロントエンドUI設計",
+        period: "2026年10月 〜 進行中",
+        status: "進行中",
+      },
+    ];
+  }, [profile]);
   // スキル申請
   const [newSkillName, setNewSkillName] = useState<string>("");
   const [newSkillCategory, setNewSkillCategory] = useState<string>("cat-it-programming");
@@ -356,6 +416,173 @@ export default function Home() {
     };
   }, [activeNav, user]);
 
+  // ──────── 自分の受け取った相互評価サマリーの取得 ────────
+  useEffect(() => {
+    if (activeNav !== "profile" || !user) return;
+    let active = true;
+
+    const loadMyEval = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/evaluations?targetUid=${user.uid}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setMyEvalSummary(data.summary || null);
+        }
+      } catch (err) {
+        console.error("評価サマリー取得エラー:", err);
+      }
+    };
+
+    loadMyEval();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, user]);
+
+  // ──────── メンバー一覧の平均星評価の取得 ────────
+  useEffect(() => {
+    if (!activeNav.startsWith("workspace") || !user || projectMembers.length === 0) return;
+    let active = true;
+
+    const loadMemberSummaries = async () => {
+      try {
+        const token = await user.getIdToken();
+        const uids = projectMembers.map((m) => m.userId).join(",");
+        const res = await fetch(`/api/student/evaluations?summaryUids=${encodeURIComponent(uids)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setMemberSummaries(data.summaries || {});
+        }
+      } catch (err) {
+        console.error("メンバー評価星取得エラー:", err);
+      }
+    };
+
+    loadMemberSummaries();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, user, projectMembers]);
+
+  // ──────── 現在のプロジェクトで自分が送信した評価の取得 ────────
+  useEffect(() => {
+    if (!activeNav.startsWith("workspace") || !activeProjectId || !user) return;
+    let active = true;
+
+    const loadSentEvals = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/evaluations?projectId=${activeProjectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setMySentEvals(data.evaluations || []);
+        }
+      } catch (err) {
+        console.error("送信済み評価取得エラー:", err);
+      }
+    };
+
+    loadSentEvals();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, activeProjectId, user]);
+
+  // ──────── 相互評価モーダルを開く ────────
+  const handleOpenEvalModal = (member: ProjectMemberResponseItem) => {
+    setEvalTargetMember(member);
+    const existing = mySentEvals.find((e) => e.toUid === member.userId);
+    if (existing) {
+      setEvalScores({
+        contribution: existing.scores?.contribution || 5,
+        trust: existing.scores?.trust || 5,
+        cooperation: existing.scores?.cooperation || 5,
+        sharing: existing.scores?.sharing || 5,
+      });
+      setEvalComment(existing.comment || "");
+    } else {
+      setEvalScores({ contribution: 5, trust: 5, cooperation: 5, sharing: 5 });
+      setEvalComment("");
+    }
+    setEvalModalOpen(true);
+    setEvalSuccessMessage(null);
+  };
+
+  // ──────── 相互評価の送信・更新 ────────
+  const handleSubmitEvaluation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !activeProjectId || !evalTargetMember) return;
+    setIsSubmittingEval(true);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/evaluations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          projectId: activeProjectId,
+          toUid: evalTargetMember.userId,
+          scores: evalScores,
+          comment: evalComment.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setEvalSuccessMessage(data.message || "相互評価を登録しました！");
+        setMySentEvals((prev) => {
+          const filtered = prev.filter((item) => item.toUid !== evalTargetMember.userId);
+          return [
+            ...filtered,
+            {
+              id: data.evalId || `${activeProjectId}_${user.uid}_${evalTargetMember.userId}`,
+              projectId: activeProjectId,
+              fromUid: user.uid,
+              fromName: profile?.displayName || "自分",
+              toUid: evalTargetMember.userId,
+              toName: evalTargetMember.displayName,
+              scores: evalScores,
+              comment: evalComment.trim(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ];
+        });
+
+        // メンバー星評価一覧を再取得
+        const uids = projectMembers.map((m) => m.userId).join(",");
+        const sumRes = await fetch(`/api/student/evaluations?summaryUids=${encodeURIComponent(uids)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (sumRes.ok) {
+          const sumData = await sumRes.json();
+          setMemberSummaries(sumData.summaries || {});
+        }
+
+        setTimeout(() => {
+          setEvalModalOpen(false);
+          setEvalSuccessMessage(null);
+        }, 1500);
+      } else {
+        alert(data.error || "相互評価の送信に失敗しました。");
+      }
+    } catch {
+      alert("通信エラーが発生しました。");
+    } finally {
+      setIsSubmittingEval(false);
+    }
+  };
+
   // ──────── W02 応募の提出 ────────
   const handleSendApplication = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -474,11 +701,6 @@ export default function Home() {
       alert("通信エラーが発生しました。");
     }
   };
-
-  // ──────── プロジェクトIDおよびサブタブの正確なパース ────────
-  const parsedWorkspace = parseWorkspaceNav(activeNav);
-  const activeProjectId = parsedWorkspace.projectId;
-  const currentSubTab = parsedWorkspace.subTab || workspaceSubTab || "chat";
 
   // ──────── 開いているプロジェクト詳細の動的取得 ────────
   const [activeProjectDetail, setActiveProjectDetail] = useState<{
@@ -1667,6 +1889,67 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* 相互評価サマリー（受け取った評価の平均） */}
+              <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-[#B87503]/20 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-[#3D2406] flex items-center gap-2">
+                      <span>⭐</span>
+                      <span>メンバー相互評価</span>
+                    </h3>
+                    <p className="text-xs text-[#7A5726]">
+                      終了したプロジェクトの仲間から受け取った、貢献・信頼・協調・発信の4項目評価です。
+                    </p>
+                  </div>
+                  {myEvalSummary && myEvalSummary.count > 0 && (
+                    <span className="text-xs font-bold text-[#B87503] bg-[#FFF8E1] px-3 py-1 rounded-full border border-[#F5B301]">
+                      {myEvalSummary.count}件の相互評価
+                    </span>
+                  )}
+                </div>
+
+                {!myEvalSummary || myEvalSummary.count === 0 ? (
+                  <div className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 text-xs text-[#7A5726] text-center font-medium">
+                    まだ評価はありません
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20">
+                    {/* 全体平均 */}
+                    <div className="flex flex-col items-center sm:items-start gap-1">
+                      <span className="text-xs text-[#7A5726] font-bold">総合平均評価</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xl sm:text-2xl font-black text-[#B87503]">
+                          {renderStars(myEvalSummary.averageOverall)}
+                        </span>
+                        <span className="text-lg sm:text-xl font-black text-[#3D2406]">
+                          {myEvalSummary.averageOverall.toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4項目それぞれの平均 */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+                      {[
+                        { label: "貢献", score: myEvalSummary.contributionAvg },
+                        { label: "信頼", score: myEvalSummary.trustAvg },
+                        { label: "協調", score: myEvalSummary.cooperationAvg },
+                        { label: "発信", score: myEvalSummary.sharingAvg },
+                      ].map((sc) => (
+                        <div
+                          key={sc.label}
+                          className="p-2.5 rounded-xl bg-[#FFFBEB] border border-[#B87503]/20 flex flex-col items-center gap-0.5"
+                        >
+                          <span className="text-[11px] font-bold text-[#7A5726]">{sc.label}</span>
+                          <span className="text-xs font-black text-[#B87503]">
+                            ★ {sc.score.toFixed(1)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* 放射状スキルツリービジュアライザー（お手本画像完全準拠） */}
               <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs">
                 <SkillTreeVisualizer
@@ -1674,6 +1957,48 @@ export default function Home() {
                   requiredSkillsFromProjects={requiredSkillsFromProjects}
                   onApplyNewSkill={() => setActiveNav("submit")}
                 />
+              </div>
+
+              {/* 関わったプロジェクト一覧 */}
+              <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-4">
+                <div className="border-b border-[#B87503]/20 pb-3">
+                  <h3 className="text-base font-black text-[#3D2406] flex items-center gap-2">
+                    <span>📁</span>
+                    <span>関わったプロジェクト</span>
+                  </h3>
+                  <p className="text-xs text-[#7A5726]">
+                    これまでに参加した共創プロジェクトの履歴と担当した役割の一覧です。
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  {participatedProjects.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              p.status === "完了"
+                                ? "bg-[#EDF7ED] text-[#1E4620] border border-[#81C784]"
+                                : "bg-[#FFF8E1] text-[#B87503] border border-[#F5B301]"
+                            }`}
+                          >
+                            {p.status}
+                          </span>
+                          <span className="text-[10px] text-[#7A5726]">{p.period}</span>
+                        </div>
+                        <h4 className="font-bold text-sm text-[#3D2406] line-clamp-2">{p.title}</h4>
+                      </div>
+                      <div className="pt-2 border-t border-[#B87503]/10 flex items-center justify-between">
+                        <span className="text-[11px] text-[#7A5726]">担当役割:</span>
+                        <span className="font-bold text-[#3D2406] text-[11px]">{p.roleName}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -2692,6 +3017,9 @@ export default function Home() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       {projectMembers.map((m) => {
                         const isLoadingThis = handoverLoadingUserId === m.userId;
+                        const memberStar = memberSummaries[m.userId];
+                        const isSentEval = mySentEvals.some((e) => e.toUid === m.userId);
+
                         return (
                           <div key={m.userId} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2">
                             <div className="flex items-center justify-between">
@@ -2704,12 +3032,32 @@ export default function Home() {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[11px] text-[#7A5726]">{m.schoolName}</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[11px] text-[#7A5726]">{m.schoolName}</span>
+                                  <span className="text-[10px] font-bold text-[#B87503] bg-[#FFF8E1] px-1.5 py-0.2 rounded border border-[#B87503]/20">
+                                    ★ {memberStar && memberStar.count > 0 ? `${memberStar.averageOverall.toFixed(1)} (${memberStar.count}件)` : "-"}
+                                  </span>
+                                </div>
                               </div>
                               <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
                                 {m.roleName}
                               </span>
                             </div>
+
+                            {/* 終了プロジェクト相互評価ボタン */}
+                            {isCurrentProjectCompleted && m.userId !== user?.uid && (
+                              <div className="flex items-center justify-between pt-1 border-t border-[#B87503]/10">
+                                <span className="text-[10px] font-bold text-[#B87503]">プロジェクト完了</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEvalModal(m)}
+                                  className="px-3 py-1 rounded-full bg-[#F5B301] text-[#3D2406] text-[11px] font-bold hover:bg-[#E0A200] shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>⭐</span>
+                                  <span>{isSentEval ? "相互評価済み（修正）" : "相互評価する"}</span>
+                                </button>
+                              </div>
+                            )}
 
                             <div className="flex items-center justify-between pt-1 border-t border-[#B87503]/10">
                               <span className="text-[10px] text-[#7A5726]">引継ぎ支援</span>
@@ -2828,6 +3176,123 @@ export default function Home() {
           )}
         </main>
       </div>
+
+      {/* ──────── 相互評価モーダル ──────── */}
+      {evalModalOpen && evalTargetMember && (
+        <div className="fixed inset-0 z-50 bg-[#3D2406]/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSubmitEvaluation}
+            className="bg-[#FFFBEB] max-w-md w-full rounded-3xl p-6 border-2 border-[#B87503] shadow-2xl flex flex-col gap-4 text-left"
+          >
+            <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-2">
+              <h3 className="text-base font-black text-[#3D2406] flex items-center gap-1.5">
+                <span>⭐</span>
+                <span>メンバー相互評価</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEvalModalOpen(false)}
+                className="text-xs font-bold text-[#7A5726] hover:text-[#3D2406]"
+              >
+                ✕ 閉じる
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#FFFDF7] border border-[#B87503]/20 text-xs flex flex-col gap-1">
+              <div>
+                <span className="text-[#7A5726]">評価相手: </span>
+                <span className="font-bold text-[#3D2406]">{evalTargetMember.displayName}</span>
+                <span className="text-[#7A5726] ml-2">
+                  ({evalTargetMember.schoolName} / {evalTargetMember.roleName})
+                </span>
+              </div>
+              <p className="text-[11px] text-[#5C3D15] mt-0.5">
+                プロジェクト完了後の活動を振り返り、「貢献」「信頼」「協調」「発信」の4項目を星1〜5で評価してください。
+              </p>
+            </div>
+
+            {/* 4項目の星評価（1〜5） */}
+            <div className="flex flex-col gap-2.5 py-1">
+              {[
+                { key: "contribution", label: "貢献", desc: "割り当てられたタスクの達成度や成果物への貢献" },
+                { key: "trust", label: "信頼", desc: "約束や納期の遵守、責任感のある行動" },
+                { key: "cooperation", label: "協調", desc: "チームワーク、他メンバーへの配慮・サポート" },
+                { key: "sharing", label: "発信", desc: "進捗報告や意見の明確な共有・ディスカッション" },
+              ].map((item) => {
+                const currentScore = evalScores[item.key as keyof typeof evalScores];
+                return (
+                  <div
+                    key={item.key}
+                    className="flex flex-col gap-1 bg-[#FFFDF7] p-2.5 rounded-xl border border-[#B87503]/15"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-[#3D2406]">{item.label}</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() =>
+                              setEvalScores((prev) => ({ ...prev, [item.key]: star }))
+                            }
+                            className={`text-lg transition-transform hover:scale-125 focus:outline-none cursor-pointer ${
+                              star <= currentScore ? "text-[#F5B301]" : "text-[#B87503]/25"
+                            }`}
+                            title={`${star}点`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                        <span className="text-xs font-bold text-[#3D2406] ml-1.5 w-6 text-right">
+                          {currentScore}点
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-[#7A5726]">{item.desc}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ひとことコメント */}
+            <div>
+              <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                ひとことコメント（任意）
+              </label>
+              <textarea
+                rows={2}
+                placeholder="例: データ分析の精度が高く、チームの課題解決を大きく前進させてくれました！"
+                value={evalComment}
+                onChange={(e) => setEvalComment(e.target.value)}
+                className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406] focus:outline-none focus:border-[#F5B301]"
+              />
+            </div>
+
+            {evalSuccessMessage && (
+              <div className="p-2.5 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs font-bold">
+                ✓ {evalSuccessMessage}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#B87503]/20">
+              <button
+                type="button"
+                onClick={() => setEvalModalOpen(false)}
+                className="px-4 py-2 rounded-full border border-[#B87503]/30 text-xs font-bold text-[#7A5726] hover:bg-[#FFFDF7]"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingEval}
+                className="px-5 py-2 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingEval ? "送信中..." : "評価を送信する"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* ──────── 応募モーダル ──────── */}
       {applyModalOpen && selectedIdea && selectedRoleForApply && (

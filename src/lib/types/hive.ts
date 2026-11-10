@@ -20,6 +20,35 @@ export interface UserRank {
   evaluationsCount: number; // 相互評価の件数
 }
 
+// 終了プロジェクト相互評価（貢献・信頼・協調・発信）
+export interface MemberEvaluation {
+  id: string;
+  projectId: string;
+  projectTitle?: string;
+  fromUid: string;
+  fromName: string;
+  toUid: string;
+  toName: string;
+  scores: {
+    contribution: number; // 貢献 (1〜5)
+    trust: number;        // 信頼 (1〜5)
+    cooperation: number;  // 協調 (1〜5)
+    sharing: number;      // 発信 (1〜5)
+  };
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvaluationSummary {
+  averageOverall: number;
+  contributionAvg: number;
+  trustAvg: number;
+  cooperationAvg: number;
+  sharingAvg: number;
+  count: number;
+}
+
 // 時間割・空き時間（月〜金、1〜5限 + 夜間など）
 export type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type TimeSlot = 1 | 2 | 3 | 4 | 5 | 6; // 時限
