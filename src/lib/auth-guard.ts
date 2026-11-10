@@ -33,9 +33,12 @@ export async function getAuthenticatedUser(
 
     const data = userDoc.data();
     const roles: string[] = Array.isArray(data?.roles) ? data.roles : ["student"];
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
     const isMasterAdmin =
-      data?.email === "stromain.hq@gmail.com" ||
-      data?.displayName === "HQ stromain" ||
+      Boolean(data?.email && adminEmails.includes(data.email.toLowerCase())) ||
       userDoc.id === "b0cpHSYLkQe63UsjTIQgJMUrRWh1";
     const isAdmin = roles.includes("admin") || isMasterAdmin;
     const finalRoles = isAdmin && !roles.includes("admin") ? [...roles, "admin"] : roles;

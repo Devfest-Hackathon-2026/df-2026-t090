@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HIVE（ハイブ）
 
-## Getting Started
+> **「その夢を実現させる仲間を見つけよう。」**  
+> 大学・高専の垣根を越え、異なる専門スキルを持つ学生同士が分野を越えて仲間を探せるプロジェクト共創 Web アプリケーション
 
-First, run the development server:
+---
+
+## 🌐 本番公開 URL
+👉 **[https://hive-1045771000909.asia-northeast1.run.app](https://hive-1045771000909.asia-northeast1.run.app)**  
+（Google Cloud Run 東京リージョンにて常時稼働中）
+
+---
+
+## 📂 提出資料（Google ドライブ）
+審査用の提出資料一式（プロダクト説明ドキュメント、デモ動画、ピッチ用スライド、著作物利用シート）は、以下のドライブフォルダに格納されています。
+
+🔗 **提出資料フォルダ**: `[ドライブのURL]`  
+*(※提出用リンク)*
+
+- **プロダクト説明ドキュメント**: 設計思想、課題の根拠、AI活用場面、技術選定理由を網羅
+- **デモ動画**: 「ロール応募 → 提唱者承認 → チャット開始 → AI進行度測定」の一連の実動デモ
+- **ピッチ用スライド**: Regional Day / ピッチ審査用プレゼンテーション資料
+- **著作物利用シート**: 利用アセット一覧（画像・フォント等）
+
+---
+
+## 🛠️ 活用している Google 技術スタック
+
+プロダクトの中核アーキテクチャは、すべて Google のクラウド技術・AI 技術で構成されています。
+
+| Google 技術 | プロダクトでの役割・活用場面 | 選定理由（Own the Why） |
+| :--- | :--- | :--- |
+| **Google Cloud Run** | Web アプリケーション全体のサーバーレス実行基盤（Next.js App Router） | 東京リージョン（`asia-northeast1`）での低遅延稼働、コンテナによる完全な可搬性、自動スケーリング。 |
+| **Firebase Authentication** | 大学・高専生向けのセキュアな Google アカウント認証 | 学生が手軽かつ安全に 1 クリックで認証可能。認可ガード（`auth-guard.ts`）と連動。 |
+| **Cloud Firestore** | スキルツリー、プロジェクト公募、リアルタイムチャット、追記専用監査ログのデータストア | オフライン対応、リアルタイムリスナー（`onSnapshot`）によるミリ秒単位のチャット・応募通知同期。 |
+| **Vertex AI (Gemini API)** | **AI によるプロジェクト進行度客観診断**、AI マッチング推薦理由生成、AI 引継ぎ要約 | 単なる数値計算ではなく、ゴールや会話履歴から「なぜその進捗率なのかの根拠（Why）」を言語化。エンタープライズ品質のデータガバナンスと ADC 認証。 |
+
+---
+
+## 🎯 プロダクトの特徴と主な機能
+
+1. **放射状スキルツリー（W03）**
+   - 本人を起点に、生命科学・情報・語学・経験の 4 分野へ枝が広がるビジュアルツリー。
+   - 講義・実験や個人開発の成果物 URL を根拠として運営に申請（W05）し、審査（A02）を経て認定。
+2. **在籍校だけでは実現できないプロジェクト公募（W01, W02, W05）**
+   - 「自大学内の専門だけでは不足している理由」を必須として提唱・審査（A03）。
+   - 農学×美大、工学×医療など、異なる専門性を持つ他大学の学生をロール別に公募。
+3. **1 クリック応募 ＆ 提唱者承認（W02, W04）**
+   - ロールを選んで動機を送信。提唱者がスカウト画面から承認すると即座にチームメンバーへ合流。
+4. **プロジェクト作業画面（W06〜W09）**
+   - 進行役による★固定「全体連絡」（確認期限、確認ボタン、「3/6人確認済み」表示）。
+   - リアルタイムチャット、共有ファイル（W07）、大学時間割の空き時間ヒートマップ（W08）。
+5. **🤖 Vertex AI Gemini によるプロジェクト進行度測定（新機能）**
+   - 目標・メンバー・直近のチャット発言から、Gemini が達成度（%）、順調な点、ボトルネック、次の一歩のアドバイスを診断。
+   - 「なぜその進捗率なのか」の客観的根拠（Why）を可視化。
+
+---
+
+## 💻 動かし方の概要（Local Development）
+
+### 前提条件
+- Node.js 20.x 以上
+- Google Cloud プロジェクト設定（Cloud Run、Firestore、Vertex AI 有効化）
+- Google Cloud SDK（ADC: `gcloud auth application-default login` 設定済み）
+
+### セットアップ手順
 
 ```bash
+# 1. 依存パッケージのインストール
+npm install
+
+# 2. マスターデータと学生・デモプロジェクトの投入
+npx tsx scripts/seed-master.ts
+npx tsx scripts/seed.ts
+npx tsx scripts/seed-ten-students.ts
+
+# 3. 開発用ローカルサーバーの起動
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで `http://localhost:3000` を開くとアプリケーションが起動します。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 本番ビルドとデプロイ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# 型チェックとプロダクションビルド
+npm run lint
+npx tsc --noEmit
+npm run build
 
-## Learn More
+# Cloud Run へのデプロイ
+gcloud run deploy hive \
+  --source . \
+  --region=asia-northeast1 \
+  --allow-unauthenticated \
+  --max-instances=3
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📜 ライセンス
+[MIT License](LICENSE)

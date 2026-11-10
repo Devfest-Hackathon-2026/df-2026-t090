@@ -33,16 +33,6 @@ export default function AdminLayout({
         return;
       }
 
-      // 本部管理者・開発者アカウントの即時認識
-      const isKnownAdmin =
-        currentUser.email === "stromain.hq@gmail.com" ||
-        currentUser.displayName === "HQ stromain" ||
-        currentUser.displayName === "冬月";
-
-      if (isKnownAdmin) {
-        setIsAdmin(true);
-      }
-
       try {
         const token = await currentUser.getIdToken();
         const res = await fetch("/api/auth/me", {
@@ -54,12 +44,12 @@ export default function AdminLayout({
         if (res.ok) {
           const data = await res.json();
           setProfile(data.profile);
-          setIsAdmin(Boolean(data.isAdmin) || isKnownAdmin);
+          setIsAdmin(Boolean(data.isAdmin));
         } else {
-          setIsAdmin(isKnownAdmin ? true : false);
+          setIsAdmin(false);
         }
       } catch {
-        if (active) setIsAdmin(isKnownAdmin ? true : false);
+        if (active) setIsAdmin(false);
       } finally {
         if (active) setLoading(false);
       }

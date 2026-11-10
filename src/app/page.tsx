@@ -218,13 +218,6 @@ export default function Home() {
       unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
-          const isKnownAdmin =
-            currentUser.email === "stromain.hq@gmail.com" ||
-            currentUser.displayName === "HQ stromain" ||
-            currentUser.displayName === "冬月";
-          if (isKnownAdmin) {
-            setIsAdmin(true);
-          }
           fetchUserProfile(currentUser);
         } else {
           setProfile(null);

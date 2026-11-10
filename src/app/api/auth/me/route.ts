@@ -23,9 +23,12 @@ export async function GET(request: Request) {
 
     const data = userDoc.data();
     const roles: string[] = Array.isArray(data?.roles) ? data.roles : ["student"];
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
     const isMasterAdmin =
-      data?.email === "stromain.hq@gmail.com" ||
-      data?.displayName === "HQ stromain" ||
+      Boolean(data?.email && adminEmails.includes(data.email.toLowerCase())) ||
       userDoc.id === "b0cpHSYLkQe63UsjTIQgJMUrRWh1" ||
       userDoc.id === "WrTz65qe6AekWcZ6AcUVUI9eK3t2";
     const isAdmin = roles.includes("admin") || isMasterAdmin;
@@ -91,8 +94,14 @@ export async function POST(request: Request) {
     const existingData = existingDoc.exists ? existingDoc.data() : null;
     const existingRoles = Array.isArray(existingData?.roles) ? existingData.roles : ["student"];
 
-    // 開発者・本部管理者または明示的な有効化の場合、adminロールを付与
-    const isAdminEmail = body.email === "stromain.hq@gmail.com" || existingData?.email === "stromain.hq@gmail.com";
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const isAdminEmail = Boolean(
+      (body.email && adminEmails.includes(body.email.toLowerCase())) ||
+      (existingData?.email && adminEmails.includes(existingData.email.toLowerCase()))
+    );
     const shouldGrantAdmin = isAdminEmail || body.grantAdmin === true || existingRoles.includes("admin");
     const finalRoles = shouldGrantAdmin && !existingRoles.includes("admin")
       ? [...existingRoles, "admin"]

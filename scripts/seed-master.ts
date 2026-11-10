@@ -212,15 +212,15 @@ async function seedMaster() {
     console.log(`  ✓ スキル: [${skill.categoryName}] ${skill.name}`);
   }
 
-  // 4. 初期運営者アカウントの設定（開発者・運営ユーザー）
+  // 4. 初期運営者アカウントの設定（環境変数または既定管理者）
   console.log("\n🛡️ 運営者権限（Admin）の設定中...");
-  const adminEmail = "stromain.hq@gmail.com";
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
   const usersSnapshot = await db.collection("users").get();
   let adminAssigned = false;
 
   for (const doc of usersSnapshot.docs) {
     const data = doc.data();
-    if (data.email === adminEmail || doc.id.includes("stromain") || data.displayName?.includes("stromain")) {
+    if (data.email === adminEmail) {
       await doc.ref.set(
         {
           roles: ["student", "admin"],
