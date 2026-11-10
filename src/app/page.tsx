@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { FILTER_FIELDS, FilterField } from "@/lib/constants";
@@ -10,6 +10,7 @@ import { ProjectFileItem } from "@/app/api/student/projects/[id]/files/route";
 import { formatJSTDateTime } from "@/lib/theme";
 import StudentSidebar from "@/components/StudentSidebar";
 import OnboardingModal from "@/components/OnboardingModal";
+import SkillTreeVisualizer from "@/components/SkillTreeVisualizer";
 
 interface RoleItem {
   name: string;
@@ -193,6 +194,26 @@ export default function Home() {
   // ──────── W03 スキルツリー用State ────────
   const [userBranches, setUserBranches] = useState<UserSkillBranch[]>([]);
   const [selectedBranchDetail, setSelectedBranchDetail] = useState<UserSkillBranch | null>(null);
+
+  // 参加中・公開中プロジェクトのロールで求められているスキル一覧（次に伸ばせる枝用）
+  const requiredSkillsFromProjects = useMemo(() => {
+    const list: Array<{ skillName: string; projectTitle: string; roleName: string }> = [];
+    publishedIdeas.forEach((idea) => {
+      idea.roles?.forEach((role) => {
+        role.skills?.forEach((sName) => {
+          const clean = sName.trim();
+          if (clean) {
+            list.push({
+              skillName: clean,
+              projectTitle: idea.title,
+              roleName: role.name,
+            });
+          }
+        });
+      });
+    });
+    return list;
+  }, [publishedIdeas]);
 
   // ──────── W05 申請・公開用State ────────
   const [submitTab, setSubmitTab] = useState<"skill" | "project">("skill");
@@ -1639,126 +1660,14 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 放射状スキルツリービジュアライザー */}
-              <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-[#B87503]/20 pb-3">
-                  <div>
-                    <h3 className="text-base font-black text-[#3D2406] flex items-center gap-2">
-                      <span>🌿</span>
-                      <span>放射状スキルツリー</span>
-                    </h3>
-                    <p className="text-xs text-[#7A5726]">
-                      中心のあなたから各分野に枝が伸びます（緑: 審査済み、黄: 審査中、点線: 次に伸ばせる枝）。
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] font-bold">
-                    <span className="flex items-center gap-1 text-[#1E4620]">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#81C784]" />
-                      <span>審査済み</span>
-                    </span>
-                    <span className="flex items-center gap-1 text-[#B87503]">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#F5B301]" />
-                      <span>審査中</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* 4分野ごとの枝一覧（放射状レイアウト） */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  {[
-                    { id: "cat-life-science", name: "🌱 生命科学・農学", icon: "🌱" },
-                    { id: "cat-it-programming", name: "💻 情報・プログラミング", icon: "💻" },
-                    { id: "cat-language-exams", name: "🌐 語学・資格試験", icon: "🌐" },
-                    { id: "cat-experience", name: "🤝 経験・デザイン", icon: "🤝" },
-                  ].map((cat) => {
-                    const catBranches = userBranches.filter(
-                      (b) => b.categoryId === cat.id || b.categoryName === cat.name
-                    );
-                    return (
-                      <div
-                        key={cat.id}
-                        className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2.5"
-                      >
-                        <span className="font-black text-xs text-[#3D2406] flex items-center gap-1.5 border-b border-[#B87503]/15 pb-1.5">
-                          <span>{cat.icon}</span>
-                          <span>{cat.name}</span>
-                          <span className="ml-auto text-[10px] text-[#7A5726]">
-                            {catBranches.length} 枝
-                          </span>
-                        </span>
-
-                        <div className="flex flex-wrap gap-2">
-                          {catBranches.length === 0 ? (
-                            <span className="text-[11px] text-[#7A5726] italic py-2">
-                              まだ枝がありません。「申請」から追加できます。
-                            </span>
-                          ) : (
-                            catBranches.map((branch) => {
-                              const isVerified = branch.status === "verified";
-                              const isPending = branch.status === "pending";
-                              return (
-                                <button
-                                  key={branch.id}
-                                  type="button"
-                                  onClick={() => setSelectedBranchDetail(branch)}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-left flex items-center gap-1.5 border ${
-                                    isVerified
-                                      ? "bg-[#EDF7ED] text-[#1E4620] border-[#81C784] shadow-xs"
-                                      : isPending
-                                      ? "bg-[#FFF8E1] text-[#B87503] border-[#F5B301] shadow-xs"
-                                      : "bg-[#FFFDF7] text-[#7A5726] border-dashed border-[#B87503]/40"
-                                  }`}
-                                >
-                                  <span>{isVerified ? "✓" : isPending ? "⏳" : "🌱"}</span>
-                                  <span>{branch.skillName}</span>
-                                  {branch.level && (
-                                    <span className="px-1.5 py-0.2 rounded-md bg-white/70 text-[10px]">
-                                      Lv{branch.level}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              {/* 放射状スキルツリービジュアライザー（お手本画像完全準拠） */}
+              <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs">
+                <SkillTreeVisualizer
+                  userBranches={userBranches}
+                  requiredSkillsFromProjects={requiredSkillsFromProjects}
+                  onApplyNewSkill={() => setActiveNav("submit")}
+                />
               </div>
-
-              {/* 枝の詳細モーダル */}
-              {selectedBranchDetail && (
-                <div className="p-5 rounded-2xl bg-[#FFF4CA] border-2 border-[#F5B301] shadow-md flex flex-col gap-2">
-                  <div className="flex items-center justify-between border-b border-[#B87503]/20 pb-2">
-                    <span className="font-black text-sm text-[#3D2406]">
-                      枝の詳細: {selectedBranchDetail.skillName}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBranchDetail(null)}
-                      className="text-xs font-bold text-[#7A5726]"
-                    >
-                      ✕ 閉じる
-                    </button>
-                  </div>
-                  <div className="text-xs text-[#5C3D15] flex flex-col gap-1">
-                    <div>
-                      分野: <span className="font-bold">{selectedBranchDetail.categoryName}</span>
-                    </div>
-                    {selectedBranchDetail.level && (
-                      <div>
-                        認定レベル: <span className="font-bold">Lv{selectedBranchDetail.level}（ひとりでできる）</span>
-                      </div>
-                    )}
-                    {selectedBranchDetail.reviewerComment && (
-                      <p className="p-2 rounded-xl bg-[#FFFDF7] border border-[#B87503]/20 mt-1">
-                        運営認定コメント: {selectedBranchDetail.reviewerComment}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
