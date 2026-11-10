@@ -770,11 +770,20 @@ async function seedDemoProjects() {
       console.log(`📁 プロジェクト「${pj.title}」(${pId}) を更新中...`);
 
       // 1. プロジェクト本体の更新（ゴール、進み具合、isSample: true）
+      // 既存の result を保持したまま result.title と result.goal にも同期書き込み
       const pDocRef = db.collection("ideas").doc(pId);
+      const existingDoc = await pDocRef.get();
+      const existingResult = existingDoc.data()?.result || {};
+
       await pDocRef.set(
         {
           title: pj.title,
           goal: pj.goal,
+          result: {
+            ...existingResult,
+            title: pj.title,
+            goal: pj.goal,
+          },
           status: pj.status,
           isCompleted: pj.isCompleted,
           isSample: true,
