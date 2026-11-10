@@ -127,9 +127,26 @@ export async function POST(
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    const newMessage: ProjectMessage = {
+      id: msgRef.id,
+      projectId,
+      roomId,
+      senderUid: authUser.uid,
+      senderName,
+      senderSchool,
+      senderRole,
+      text: text.trim(),
+      isAnnouncement: Boolean(isAnnouncement),
+      deadline: isAnnouncement && deadline ? deadline : undefined,
+      confirmedUserUids: [],
+      totalMembersCount: 1,
+      createdAt: new Date().toISOString(),
+    };
+
     return NextResponse.json({
       message: "メッセージを送信しました。",
       messageId: msgRef.id,
+      newMessage,
     });
   } catch (error) {
     console.error("メッセージ送信エラー:", error);

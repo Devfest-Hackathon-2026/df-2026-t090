@@ -845,10 +845,17 @@ export default function Home() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         setChatInputText("");
         setChatIsAnnouncement(false);
         setChatDeadline("");
-        fetchChatMessages();
+        if (data.newMessage) {
+          setChatMessages((prev) => {
+            const exists = prev.some((m) => m.id === data.newMessage.id);
+            return exists ? prev : [...prev, data.newMessage];
+          });
+        }
+        await fetchChatMessages();
       } else {
         alert("メッセージ送信に失敗しました。");
       }
@@ -2307,26 +2314,11 @@ export default function Home() {
               {/* チャットサブタブの表示 */}
               {currentSubTab === "chat" && (
                 <>
-                  {/* ルーム切り替えタブ */}
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    {[
-                      { id: "general", label: "全体チャット" },
-                      { id: "task-analysis", label: "タスク: 解析パイプライン" },
-                      { id: "task-poster", label: "タスク: ポスター制作" },
-                    ].map((room) => (
-                      <button
-                        key={room.id}
-                        type="button"
-                        onClick={() => setActiveChatRoomId(room.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
-                          activeChatRoomId === room.id
-                            ? "bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]"
-                            : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1] border border-[#B87503]/25"
-                        }`}
-                      >
-                        {room.label}
-                      </button>
-                    ))}
+                  {/* チャットルーム（全体チャット） */}
+                  <div className="flex items-center gap-2">
+                    <span className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]">
+                      全体チャット
+                    </span>
                   </div>
 
                   {/* 固定表示の「全体連絡」 */}
