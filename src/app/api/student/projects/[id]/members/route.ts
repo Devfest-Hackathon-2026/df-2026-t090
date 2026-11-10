@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { authenticate } from "@/lib/auth";
 import { getAdminDb } from "@/lib/firebase-admin";
 
 export interface ProjectMemberResponseItem {
@@ -18,11 +17,6 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authUser = await authenticate(request);
-  if (!authUser) {
-    return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
-  }
-
   const { id: projectId } = await params;
 
   try {

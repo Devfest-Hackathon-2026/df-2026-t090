@@ -451,7 +451,7 @@ export default function Home() {
 
   // ──────── プロジェクト参加メンバーの動的取得 ────────
   useEffect(() => {
-    if (!activeNav.startsWith("workspace") || !activeProjectId || !user) {
+    if (!activeNav.startsWith("workspace") || !activeProjectId) {
       return;
     }
 
@@ -459,10 +459,9 @@ export default function Home() {
     const loadMembers = async () => {
       setLoadingMembers(true);
       try {
-        const token = await user.getIdToken();
-        const res = await fetch(`/api/student/projects/${activeProjectId}/members`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const token = user ? await user.getIdToken() : null;
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`/api/student/projects/${activeProjectId}/members`, { headers });
         if (res.ok) {
           const data = await res.json();
           if (active) {
@@ -569,7 +568,11 @@ export default function Home() {
 
   // ──────── AIによる引継ぎ要約の生成 ────────
   const handleGenerateHandover = async (userId: string, userName: string, roleName: string) => {
-    if (!user || !activeProjectId) return;
+    if (!user) {
+      alert("AI 引継ぎ要約を利用するには、右上のログインボタンからGoogleログインしてください。");
+      return;
+    }
+    if (!activeProjectId) return;
     setHandoverLoadingUserId(userId);
     setHandoverNoDataAlert(null);
     setHandoverSharedSuccess(null);
