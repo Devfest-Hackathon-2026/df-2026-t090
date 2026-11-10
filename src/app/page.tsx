@@ -171,6 +171,13 @@ export default function Home() {
   const [isSharingHandover, setIsSharingHandover] = useState<boolean>(false);
   const [handoverSharedSuccess, setHandoverSharedSuccess] = useState<string | null>(null);
 
+  // ──────── AIガクチカ下書き用State ────────
+  const [selectedGakuchikaPjId, setSelectedGakuchikaPjId] = useState<string>("demo-idea-craft-beer");
+  const [gakuchikaResultText, setGakuchikaResultText] = useState<string>("");
+  const [isGeneratingGakuchika, setIsGeneratingGakuchika] = useState<boolean>(false);
+  const [gakuchikaError, setGakuchikaError] = useState<string | null>(null);
+  const [gakuchikaCopyMessage, setGakuchikaCopyMessage] = useState<string | null>(null);
+
   // ──────── 参加メンバー動的取得用State ────────
   const [projectMembers, setProjectMembers] = useState<ProjectMemberResponseItem[]>([]);
   const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
@@ -732,6 +739,50 @@ export default function Home() {
     } catch {
       alert("確認処理に失敗しました。");
     }
+  };
+
+  // ──────── AIガクチカ下書き生成 ────────
+  const handleGenerateGakuchika = async () => {
+    if (!user) {
+      alert("ガクチカ生成を利用するには、右上のログインボタンからGoogleログインしてください。");
+      return;
+    }
+    if (!selectedGakuchikaPjId) return;
+
+    setIsGeneratingGakuchika(true);
+    setGakuchikaError(null);
+    setGakuchikaCopyMessage(null);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/student/gakuchika-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ projectId: selectedGakuchikaPjId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setGakuchikaError(data.error || "ガクチカ下書きの生成に失敗しました。");
+        return;
+      }
+
+      setGakuchikaResultText(data.gakuchikaText || "");
+    } catch {
+      setGakuchikaError("通信エラーが発生しました。");
+    } finally {
+      setIsGeneratingGakuchika(false);
+    }
+  };
+
+  const handleCopyGakuchika = () => {
+    if (!gakuchikaResultText) return;
+    navigator.clipboard.writeText(gakuchikaResultText);
+    setGakuchikaCopyMessage("✓ クリップボードにコピーしました！");
+    setTimeout(() => setGakuchikaCopyMessage(null), 2500);
   };
 
   // ──────── W06 AIによるプロジェクト進行度測定 ────────
@@ -2624,14 +2675,97 @@ export default function Home() {
             </div>
           )}
 
-          {/* ──────────────── 活動記録認定 ──────────────── */}
+          {/* ──────────────── 活動記録認定 ＆ AIガクチカ下書き ──────────────── */}
           {activeNav === "records" && (
-            <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
-              <span className="text-3xl">🏆</span>
-              <h2 className="text-lg font-bold text-[#3D2406]">活動記録の認定</h2>
-              <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-                活動記録の認定は今後実装予定です。
-              </p>
+            <div className="flex flex-col gap-6 text-left">
+              {/* 活動記録の認定（今後実装予定のまま残す） */}
+              <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-2">
+                <span className="text-3xl">🏆</span>
+                <h2 className="text-base sm:text-lg font-bold text-[#3D2406]">活動記録の認定</h2>
+                <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
+                  活動記録の認定は今後実装予定です。
+                </p>
+              </div>
+
+              {/* 🎓 AI ガクチカ下書き生成セクション */}
+              <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#F5B301] shadow-xs flex flex-col gap-5">
+                <div className="border-b border-[#B87503]/25 pb-3">
+                  <h3 className="text-base sm:text-lg font-black text-[#3D2406] flex items-center gap-2">
+                    <span>🎓</span>
+                    <span>AI ガクチカ下書き生成</span>
+                  </h3>
+                  <p className="text-xs text-[#7A5726] mt-0.5">
+                    参加したプロジェクトのゴール、進み具合、あなたの役割、実際の発言や担当タスクから、Gemini が就職活動のES（エントリーシート）や面接で使える「学生時代に力を入れたこと」の下書きを作成します。
+                  </p>
+                </div>
+
+                {/* プロジェクト選択 ＆ 生成ボタン */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-[#3D2406] block mb-1">
+                      対象プロジェクトを選択
+                    </label>
+                    <select
+                      value={selectedGakuchikaPjId}
+                      onChange={(e) => setSelectedGakuchikaPjId(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs font-bold text-[#3D2406]"
+                    >
+                      <option value="demo-idea-craft-beer">地域伝統クラフトビール開発</option>
+                      <option value="demo-idea-campus-map">学内空き教室リアルタイム共有</option>
+                      <option value="demo-completed-pj">放置竹林サステナブル照明 (第1期)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateGakuchika}
+                    disabled={isGeneratingGakuchika}
+                    className="sm:self-end px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F5B301] to-[#B87503] text-white text-xs font-black shadow-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🤖</span>
+                    <span>{isGeneratingGakuchika ? "Gemini が作成中..." : "Gemini でガクチカの下書きを作る 🚀"}</span>
+                  </button>
+                </div>
+
+                {gakuchikaError && (
+                  <div className="p-3.5 rounded-2xl bg-[#FFF8E1] border-2 border-[#F5B301] text-[#7A5726] text-xs font-bold">
+                    ⚠ {gakuchikaError}
+                  </div>
+                )}
+
+                {/* 生成結果の編集テキストエリア ＆ コピーボタン */}
+                {gakuchikaResultText && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#B87503]/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-[#3D2406]">
+                        生成されたガクチカ下書き（手動で加筆・修正できます）:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {gakuchikaCopyMessage && (
+                          <span className="text-xs font-bold text-[#1E4620]">
+                            {gakuchikaCopyMessage}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleCopyGakuchika}
+                          className="px-3.5 py-1 rounded-full bg-[#FFF8E1] border border-[#B87503] text-[#3D2406] text-xs font-bold hover:bg-[#F5B301] shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>📋</span>
+                          <span>下書きをコピー</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <textarea
+                      rows={8}
+                      value={gakuchikaResultText}
+                      onChange={(e) => setGakuchikaResultText(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-2xl p-4 text-xs sm:text-sm text-[#3D2406] leading-relaxed focus:outline-none focus:border-[#F5B301]"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </main>
