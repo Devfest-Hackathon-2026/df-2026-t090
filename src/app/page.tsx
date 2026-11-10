@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { FILTER_FIELDS, FilterField } from "@/lib/constants";
-import { UserProfile, ProjectApplication, ProjectMessage } from "@/lib/types/hive";
+import { UserProfile, ProjectApplication, ProjectMessage, UserSkillBranch } from "@/lib/types/hive";
 import { formatJSTDateTime } from "@/lib/theme";
 import StudentSidebar from "@/components/StudentSidebar";
 import OnboardingModal from "@/components/OnboardingModal";
@@ -47,6 +47,16 @@ interface PublishedIdea {
   publishedAt: string | null;
   author: AuthorInfo;
   aiSuggestions?: StudentSuggestion[];
+}
+
+interface ProjectProgressAiResult {
+  progressPercentage: number;
+  stageLabel: string;
+  summary: string;
+  goodPoints: string[];
+  bottlenecks: string[];
+  nextActions: string[];
+  scoreWhy: string;
 }
 
 export default function Home() {
@@ -96,6 +106,33 @@ export default function Home() {
   const [chatIsAnnouncement, setChatIsAnnouncement] = useState<boolean>(false);
   const [chatDeadline, setChatDeadline] = useState<string>("");
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>("general");
+  const [workspaceSubTab, setWorkspaceSubTab] = useState<"chat" | "files" | "calendar" | "members">("chat");
+
+  // ──────── W06 AIプロジェクト進行度測定State ────────
+  const [progressAiResult, setProgressAiResult] = useState<ProjectProgressAiResult | null>(null);
+  const [isAnalyzingProgress, setIsAnalyzingProgress] = useState<boolean>(false);
+  const [progressAiError, setProgressAiError] = useState<string | null>(null);
+
+  // ──────── W03 スキルツリー用State ────────
+  const [userBranches, setUserBranches] = useState<UserSkillBranch[]>([]);
+  const [selectedBranchDetail, setSelectedBranchDetail] = useState<UserSkillBranch | null>(null);
+
+  // ──────── W05 申請・公開用State ────────
+  const [submitTab, setSubmitTab] = useState<"skill" | "project">("skill");
+  const [submitSuccessMessage, setSubmitSuccessMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  // スキル申請
+  const [newSkillName, setNewSkillName] = useState<string>("");
+  const [newSkillCategory, setNewSkillCategory] = useState<string>("cat-it-programming");
+  const [newSkillLevel, setNewSkillLevel] = useState<number>(2);
+  const [newSkillDesc, setNewSkillDesc] = useState<string>("");
+  const [newSkillLink, setNewSkillLink] = useState<string>("");
+  // プロジェクト提唱
+  const [newPjTitle, setNewPjTitle] = useState<string>("");
+  const [newPjGoal, setNewPjGoal] = useState<string>("");
+  const [newPjReason, setNewPjReason] = useState<string>("");
+  const [newPjRole1, setNewPjRole1] = useState<string>("");
+  const [newPjRole2, setNewPjRole2] = useState<string>("");
 
   // 公開プロジェクト一覧の取得
   const fetchPublishedIdeas = async (field?: string) => {
@@ -202,7 +239,33 @@ export default function Home() {
     };
   }, [fetchUserProfile]);
 
-  // ──────── 応募の提出（W02） ────────
+  // ──────── W03 スキルツリー枝の取得 ────────
+  useEffect(() => {
+    if (activeNav !== "profile" || !user) return;
+    let active = true;
+
+    const loadBranches = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/skills?userId=${user.uid}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setUserBranches(data.branches || []);
+        }
+      } catch (err) {
+        console.error("スキルツリー取得エラー:", err);
+      }
+    };
+
+    loadBranches();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, user]);
+
+  // ──────── W02 応募の提出 ────────
   const handleSendApplication = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedIdea || !selectedRoleForApply) return;
@@ -243,7 +306,7 @@ export default function Home() {
     }
   };
 
-  // ──────── 届いた応募一覧の取得（W04） ────────
+  // ──────── W04 届いた応募一覧の取得 ────────
   const fetchApplications = useCallback(async () => {
     if (!user) return;
     try {
@@ -289,7 +352,7 @@ export default function Home() {
     };
   }, [activeNav, scoutTab, user]);
 
-  // ──────── 応募の承認／見送り処理（W04） ────────
+  // ──────── W04 応募の承認／見送り処理 ────────
   const handleApproveApplication = async (appId: string, action: "approve" | "reject") => {
     if (!user) return;
     setAppActionMessage(null);
@@ -315,7 +378,6 @@ export default function Home() {
 
       setAppActionMessage(data.message);
       fetchApplications();
-      // サイドバーの参加プロジェクトを再取得
       setRefreshSidebarTrigger((prev) => prev + 1);
     } catch {
       alert("通信エラーが発生しました。");
@@ -363,7 +425,6 @@ export default function Home() {
     };
 
     loadChat();
-    // リアルタイム更新（3秒ポーリング）
     const interval = setInterval(loadChat, 3000);
     return () => {
       active = false;
@@ -429,6 +490,122 @@ export default function Home() {
     }
   };
 
+  // ──────── W06 AIによるプロジェクト進行度測定 ────────
+  const handleAnalyzeProgressAi = async () => {
+    if (!user || !activeProjectId) return;
+    setIsAnalyzingProgress(true);
+    setProgressAiError(null);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/progress-ai`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setProgressAiError(data.error || "進行度測定に失敗しました。");
+        return;
+      }
+
+      setProgressAiResult(data.result);
+    } catch {
+      setProgressAiError("通信エラーが発生しました。");
+    } finally {
+      setIsAnalyzingProgress(false);
+    }
+  };
+
+  // ──────── W05 スキル枝の申請 ────────
+  const handleSubmitSkill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSubmitting(true);
+    setSubmitSuccessMessage(null);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/student/skills", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          skillName: newSkillName,
+          categoryId: newSkillCategory,
+          categoryName:
+            newSkillCategory === "cat-life-science"
+              ? "生命科学"
+              : newSkillCategory === "cat-it-programming"
+              ? "情報"
+              : newSkillCategory === "cat-language-exams"
+              ? "語学・試験"
+              : "経験",
+          level: newSkillLevel,
+          description: newSkillDesc,
+          linkUrl: newSkillLink,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setSubmitSuccessMessage(data.message);
+      setNewSkillName("");
+      setNewSkillDesc("");
+      setNewSkillLink("");
+    } catch (err: unknown) {
+      alert((err as Error).message || "申請に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ──────── W05 プロジェクト提唱 ────────
+  const handleSubmitProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSubmitting(true);
+    setSubmitSuccessMessage(null);
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/ideas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          topic: newPjTitle,
+          goal: newPjGoal,
+          reasonNonCampus: newPjReason,
+          fields: ["情報", "地域"],
+          roles: [
+            { name: newPjRole1 || "開発エンジニア", reason: "システム構築", skills: ["Next.js"] },
+            { name: newPjRole2 || "デザイナー", reason: "UI/UX設計", skills: ["Figma"] },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setSubmitSuccessMessage("新規プロジェクトを提唱しました！運営による公開審査（A03）へ進みます。");
+      setNewPjTitle("");
+      setNewPjGoal("");
+      setNewPjReason("");
+      setNewPjRole1("");
+      setNewPjRole2("");
+    } catch (err: unknown) {
+      alert((err as Error).message || "提唱に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ログイン・ログアウト
   const handleLogin = async () => {
     setError(null);
@@ -488,7 +665,7 @@ export default function Home() {
     }
   };
 
-  // 最上部に固定表示する「全体連絡」（最新の未確認優先）
+  // 固定表示「全体連絡」
   const announcementMessage = chatMessages.slice().reverse().find((m) => m.isAnnouncement);
 
   return (
@@ -549,11 +726,11 @@ export default function Home() {
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] mt-0.5">
                 {activeNav === "home" && "W01 ホーム（合うプロジェクト）"}
-                {activeNav === "profile" && "W03 プロフィールとスキルツリー"}
+                {activeNav === "profile" && "W03 プロフィールと放射状スキルツリー"}
                 {activeNav === "scout" && "W04 スカウト・届いた応募"}
-                {activeNav === "submit" && "W05 申請・公開"}
-                {activeNav === "records" && "活動記録"}
-                {activeNav.startsWith("workspace") && "W06 プロジェクト作業画面（チャット・全体連絡）"}
+                {activeNav === "submit" && "W05 申請・公開（スキル＆プロジェクト）"}
+                {activeNav === "records" && "活動記録認定"}
+                {activeNav.startsWith("workspace") && "W06 プロジェクト作業画面（チャット・AI進行度測定）"}
               </h1>
             </div>
 
@@ -774,7 +951,6 @@ export default function Home() {
                             return;
                           }
                           if (!selectedRoleForApply) {
-                            // デフォルトで1番目のロールを選択
                             setSelectedRoleForApply(selectedIdea.roles[0] || null);
                           }
                           setApplyModalOpen(true);
@@ -912,10 +1088,174 @@ export default function Home() {
             </div>
           )}
 
+          {/* ──────────────── W03 プロフィールと放射状スキルツリー ──────────────── */}
+          {activeNav === "profile" && (
+            <div className="flex flex-col gap-6 text-left">
+              {/* プロフィール基本カード */}
+              <div className="p-6 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503]/30 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#F5B301] to-[#B87503] flex items-center justify-center text-2xl font-black text-white shadow-md">
+                    {profile?.displayName?.[0] || user?.displayName?.[0] || "学"}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-black text-[#3D2406]">
+                        {profile?.displayName || user?.displayName || "学生ユーザー"}
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#FFF8E1] border border-[#F5B301] text-[#B87503] text-xs font-bold">
+                        段位: {profile?.rank?.title || "初段"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#7A5726] mt-0.5">
+                      {profile?.schoolName || "未登録大学"} {profile?.faculty || ""} {profile?.grade || ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav("submit")}
+                    className="px-4 py-2 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold shadow-xs hover:bg-[#E0A200]"
+                  >
+                    ＋ スキルの枝を増やす（申請）
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOnboarding(true)}
+                    className="px-3.5 py-2 rounded-full border border-[#B87503] bg-[#FFF8E1] text-[#3D2406] text-xs font-bold hover:bg-[#F5B301]"
+                  >
+                    時間割の編集
+                  </button>
+                </div>
+              </div>
+
+              {/* 放射状スキルツリービジュアライザー */}
+              <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-[#B87503]/20 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-[#3D2406] flex items-center gap-2">
+                      <span>🌿</span>
+                      <span>放射状スキルツリー</span>
+                    </h3>
+                    <p className="text-xs text-[#7A5726]">
+                      中心のあなたから各分野に枝が伸びます（緑: 審査済み、黄: 審査中、点線: 次に伸ばせる枝）。
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                    <span className="flex items-center gap-1 text-[#1E4620]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#81C784]" />
+                      <span>審査済み</span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[#B87503]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#F5B301]" />
+                      <span>審査中</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4分野ごとの枝一覧（放射状レイアウト） */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {[
+                    { id: "cat-life-science", name: "🌱 生命科学・農学", icon: "🌱" },
+                    { id: "cat-it-programming", name: "💻 情報・プログラミング", icon: "💻" },
+                    { id: "cat-language-exams", name: "🌐 語学・資格試験", icon: "🌐" },
+                    { id: "cat-experience", name: "🤝 経験・デザイン", icon: "🤝" },
+                  ].map((cat) => {
+                    const catBranches = userBranches.filter(
+                      (b) => b.categoryId === cat.id || b.categoryName === cat.name
+                    );
+                    return (
+                      <div
+                        key={cat.id}
+                        className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex flex-col gap-2.5"
+                      >
+                        <span className="font-black text-xs text-[#3D2406] flex items-center gap-1.5 border-b border-[#B87503]/15 pb-1.5">
+                          <span>{cat.icon}</span>
+                          <span>{cat.name}</span>
+                          <span className="ml-auto text-[10px] text-[#7A5726]">
+                            {catBranches.length} 枝
+                          </span>
+                        </span>
+
+                        <div className="flex flex-wrap gap-2">
+                          {catBranches.length === 0 ? (
+                            <span className="text-[11px] text-[#7A5726] italic py-2">
+                              まだ枝がありません。「申請」から追加できます。
+                            </span>
+                          ) : (
+                            catBranches.map((branch) => {
+                              const isVerified = branch.status === "verified";
+                              const isPending = branch.status === "pending";
+                              return (
+                                <button
+                                  key={branch.id}
+                                  type="button"
+                                  onClick={() => setSelectedBranchDetail(branch)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-left flex items-center gap-1.5 border ${
+                                    isVerified
+                                      ? "bg-[#EDF7ED] text-[#1E4620] border-[#81C784] shadow-xs"
+                                      : isPending
+                                      ? "bg-[#FFF8E1] text-[#B87503] border-[#F5B301] shadow-xs"
+                                      : "bg-[#FFFDF7] text-[#7A5726] border-dashed border-[#B87503]/40"
+                                  }`}
+                                >
+                                  <span>{isVerified ? "✓" : isPending ? "⏳" : "🌱"}</span>
+                                  <span>{branch.skillName}</span>
+                                  {branch.level && (
+                                    <span className="px-1.5 py-0.2 rounded-md bg-white/70 text-[10px]">
+                                      Lv{branch.level}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 枝の詳細モーダル */}
+              {selectedBranchDetail && (
+                <div className="p-5 rounded-2xl bg-[#FFF4CA] border-2 border-[#F5B301] shadow-md flex flex-col gap-2">
+                  <div className="flex items-center justify-between border-b border-[#B87503]/20 pb-2">
+                    <span className="font-black text-sm text-[#3D2406]">
+                      枝の詳細: {selectedBranchDetail.skillName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBranchDetail(null)}
+                      className="text-xs font-bold text-[#7A5726]"
+                    >
+                      ✕ 閉じる
+                    </button>
+                  </div>
+                  <div className="text-xs text-[#5C3D15] flex flex-col gap-1">
+                    <div>
+                      分野: <span className="font-bold">{selectedBranchDetail.categoryName}</span>
+                    </div>
+                    {selectedBranchDetail.level && (
+                      <div>
+                        認定レベル: <span className="font-bold">Lv{selectedBranchDetail.level}（ひとりでできる）</span>
+                      </div>
+                    )}
+                    {selectedBranchDetail.reviewerComment && (
+                      <p className="p-2 rounded-xl bg-[#FFFDF7] border border-[#B87503]/20 mt-1">
+                        運営認定コメント: {selectedBranchDetail.reviewerComment}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ──────────────── W04 スカウト・届いた応募受付 ──────────────── */}
           {activeNav === "scout" && (
             <div className="flex flex-col gap-6">
-              {/* タブ切り替え */}
               <div className="flex items-center gap-2 border-b border-[#B87503]/30 pb-3">
                 <button
                   type="button"
@@ -1030,7 +1370,6 @@ export default function Home() {
                             </span>
                           </div>
 
-                          {/* 提唱者による承認／見送りボタン */}
                           {app.status === "pending" && (
                             <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                               <button
@@ -1078,240 +1417,650 @@ export default function Home() {
             </div>
           )}
 
-          {/* ──────────────── W06 プロジェクト作業画面（チャット・全体連絡） ──────────────── */}
+          {/* ──────────────── W05 申請・公開（スキル ＆ プロジェクト） ──────────────── */}
+          {activeNav === "submit" && (
+            <div className="flex flex-col gap-6 text-left">
+              <div className="flex items-center gap-2 border-b border-[#B87503]/30 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setSubmitTab("skill")}
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    submitTab === "skill"
+                      ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
+                      : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
+                  }`}
+                >
+                  🌿 スキルの枝を審査に出す
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubmitTab("project")}
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    submitTab === "project"
+                      ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
+                      : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
+                  }`}
+                >
+                  🚀 新しいプロジェクトを提唱する
+                </button>
+              </div>
+
+              {submitSuccessMessage && (
+                <div className="p-3.5 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs sm:text-sm font-bold">
+                  ✓ {submitSuccessMessage}
+                </div>
+              )}
+
+              {/* スキル枝の申請フォーム */}
+              {submitTab === "skill" && (
+                <form
+                  onSubmit={handleSubmitSkill}
+                  className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503]/30 shadow-xs flex flex-col gap-4"
+                >
+                  <div>
+                    <h3 className="text-base font-black text-[#3D2406]">スキルの枝の審査申請（W05前半）</h3>
+                    <p className="text-xs text-[#7A5726] mt-0.5">
+                      学内での講義・実験や個人開発・資格などの根拠を提出し、運営の審査（A02）を受けます。
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                        スキル名 <span className="text-[#B87503]">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="例: Next.js / React Webアプリケーション開発"
+                        value={newSkillName}
+                        onChange={(e) => setNewSkillName(e.target.value)}
+                        className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                        分野 <span className="text-[#B87503]">*</span>
+                      </label>
+                      <select
+                        value={newSkillCategory}
+                        onChange={(e) => setNewSkillCategory(e.target.value)}
+                        className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406] font-bold"
+                      >
+                        <option value="cat-it-programming">💻 情報・プログラミング</option>
+                        <option value="cat-life-science">🌱 生命科学・農学</option>
+                        <option value="cat-language-exams">🌐 語学・資格試験</option>
+                        <option value="cat-experience">🤝 経験・デザイン</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                      自己申告レベル
+                    </label>
+                    <select
+                      value={newSkillLevel}
+                      onChange={(e) => setNewSkillLevel(Number(e.target.value))}
+                      className="bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406] font-bold"
+                    >
+                      <option value={1}>Lv1: 教わりながらできる</option>
+                      <option value={2}>Lv2: ひとりでできる</option>
+                      <option value={3}>Lv3: 人に教えられる</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                      何をしてきたか（活動実績） <span className="text-[#B87503]">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="例: 学部の専門実験において酵母と乳酸菌の共培養プロセスを担当し、レポートでA評価を得ました。"
+                      value={newSkillDesc}
+                      onChange={(e) => setNewSkillDesc(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                      根拠URL（GitHubリポジトリ、公開ポートフォリオ等）
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://github.com/..."
+                      value={newSkillLink}
+                      onChange={(e) => setNewSkillLink(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t border-[#B87503]/20">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold shadow-xs hover:bg-[#E0A200] disabled:opacity-50"
+                    >
+                      {submitting ? "提出中..." : "審査に出す 🚀"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* プロジェクト提唱フォーム */}
+              {submitTab === "project" && (
+                <form
+                  onSubmit={handleSubmitProject}
+                  className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503]/30 shadow-xs flex flex-col gap-4"
+                >
+                  <div>
+                    <h3 className="text-base font-black text-[#3D2406]">新規プロジェクトの提唱（W05後半）</h3>
+                    <p className="text-xs text-[#7A5726] mt-0.5">
+                      自大学だけでは実現できないアイデアを提唱し、他大学の専門スキルを持つ仲間を公募します。
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                      プロジェクト名 <span className="text-[#B87503]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="例: 地域伝統酒蔵と連携したクラフトビール共同開発"
+                      value={newPjTitle}
+                      onChange={(e) => setNewPjTitle(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-xs text-[#3D2406] block mb-1">
+                      目的・ゴール <span className="text-[#B87503]">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      placeholder="例: 農学部の発酵技術と美大のデザイン力を融合し、来春までに3種類の新銘柄の試作品を完成させる。"
+                      value={newPjGoal}
+                      onChange={(e) => setNewPjGoal(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406]"
+                    />
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#FFF4CA] border border-[#F5B301]">
+                    <label className="font-black text-xs text-[#B87503] block mb-1">
+                      🏫 在籍校だけでは実現できない理由（必須審査項目） <span className="text-[#B87503]">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      placeholder="例: 自大学には農学の発酵ラボはありますが、ラベルやブランドを設計するデザイン学部やWeb販売システムを構築する工学部が存在しないため、他大学の専門スキルが不可欠です。"
+                      value={newPjReason}
+                      onChange={(e) => setNewPjReason(e.target.value)}
+                      className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl p-2.5 text-xs text-[#3D2406]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="font-bold text-xs text-[#3D2406] block mb-1">募集ロール 1</label>
+                      <input
+                        type="text"
+                        placeholder="例: ハードウェア・IoT設計"
+                        value={newPjRole1}
+                        onChange={(e) => setNewPjRole1(e.target.value)}
+                        className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406]"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-xs text-[#3D2406] block mb-1">募集ロール 2</label>
+                      <input
+                        type="text"
+                        placeholder="例: UI/UXプロダクトデザイナー"
+                        value={newPjRole2}
+                        onChange={(e) => setNewPjRole2(e.target.value)}
+                        className="w-full bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs text-[#3D2406]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t border-[#B87503]/20">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 py-2.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold shadow-xs hover:bg-[#E0A200] disabled:opacity-50"
+                    >
+                      {submitting ? "提出中..." : "プロジェクト審査に出す 🚀"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* ──────────────── W06 プロジェクト作業画面（チャット・AI進行度測定） ──────────────── */}
           {activeNav.startsWith("workspace") && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 text-left">
               {/* プロジェクト作業ヘッダー */}
               <div className="flex items-center justify-between border-b border-[#B87503]/30 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">💬</span>
                   <div>
                     <h2 className="text-base sm:text-lg font-black text-[#3D2406]">
-                      プロジェクト作業画面（W06 チャット）
+                      プロジェクト作業画面
                     </h2>
                     <span className="text-xs text-[#7A5726]">
-                      ルーム: {activeChatRoomId === "general" ? "全体チャット" : "タスク別チャット"}
+                      共創チーム作業スペース（W06 チャット / W07 ファイル / W08 空き時間 / W09 メンバー）
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* ★新機能: AI進行度測定ボタン */}
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeProgressAi}
+                    disabled={isAnalyzingProgress}
+                    className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#F5B301] to-[#B87503] text-white text-xs font-bold shadow-sm hover:opacity-90 flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span>🤖</span>
+                    <span>{isAnalyzingProgress ? "AI分析中..." : "AI進行度測定"}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => alert("ビデオ通話URLを発行しました: https://meet.google.com/hive-demo")}
-                    className="px-3.5 py-1.5 rounded-full border border-[#B87503] bg-[#FFF8E1] text-[#3D2406] text-xs font-bold hover:bg-[#F5B301] shadow-xs flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-full border border-[#B87503] bg-[#FFF8E1] text-[#3D2406] text-xs font-bold hover:bg-[#F5B301] shadow-xs flex items-center gap-1"
                   >
                     <span>📹</span>
-                    <span>ビデオ通話</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={fetchChatMessages}
-                    className="px-3 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs"
-                  >
-                    🔄 更新
+                    <span>Meet通話</span>
                   </button>
                 </div>
               </div>
 
-              {/* ルーム切り替えタブ */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              {/* サブタブ（チャット、ファイル、予定空き時間、メンバー引継ぎ） */}
+              <div className="flex items-center gap-2 border-b border-[#B87503]/20 pb-2">
                 {[
-                  { id: "general", label: "全体チャット" },
-                  { id: "task-analysis", label: "タスク: 解析パイプライン" },
-                  { id: "task-poster", label: "タスク: ポスター制作" },
-                ].map((room) => (
+                  { id: "chat", label: "💬 チャット" },
+                  { id: "files", label: "📁 共有ファイル (W07)" },
+                  { id: "calendar", label: "📅 空き時間重ね合わせ (W08)" },
+                  { id: "members", label: "👥 メンバーと引継ぎ (W09)" },
+                ].map((tab) => (
                   <button
-                    key={room.id}
+                    key={tab.id}
                     type="button"
-                    onClick={() => setActiveChatRoomId(room.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
-                      activeChatRoomId === room.id
-                        ? "bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]"
-                        : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1] border border-[#B87503]/25"
+                    onClick={() => setWorkspaceSubTab(tab.id as "chat" | "files" | "calendar" | "members")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      workspaceSubTab === tab.id
+                        ? "bg-[#F5B301] text-[#3D2406] shadow-xs"
+                        : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1]"
                     }`}
                   >
-                    {room.label}
+                    {tab.label}
                   </button>
                 ))}
               </div>
 
-              {/* ★仕様書重要項目: 固定表示の「全体連絡」（確認期限・確認ボタン・人数表示） */}
-              {announcementMessage && (
-                <div className="p-4 rounded-2xl bg-[#FFF4CA] border-2 border-[#F5B301] shadow-md flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
+              {/* ★新機能: Gemini AIによるプロジェクト進行度測定パネル */}
+              {progressAiResult && (
+                <div className="p-5 rounded-3xl bg-gradient-to-br from-[#FFFBEB] to-[#FFF4CA] border-2 border-[#F5B301] shadow-md flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-[#B87503]/25 pb-2">
                     <span className="text-xs font-black text-[#B87503] flex items-center gap-1.5">
-                      <span>📢</span>
-                      <span>進行役からの全体連絡（重要）</span>
+                      <span>🤖</span>
+                      <span>Vertex AI Gemini によるプロジェクト進行度診断結果</span>
                     </span>
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#3D2406]">
-                      <span>
-                        確認済み: {announcementMessage.confirmedUserUids.length} / {announcementMessage.totalMembersCount || 3} 人
+                    <button
+                      type="button"
+                      onClick={() => setProgressAiResult(null)}
+                      className="text-xs font-bold text-[#7A5726]"
+                    >
+                      ✕ 閉じる
+                    </button>
+                  </div>
+
+                  {/* 進行度ゲージ */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-[#F5B301] min-w-[100px] shadow-xs">
+                      <span className="text-2xl font-black text-[#B87503]">
+                        {progressAiResult.progressPercentage}%
                       </span>
-                      {announcementMessage.deadline && (
-                        <span className="text-[10px] text-[#7A5726] bg-[#FFFBEB] px-2 py-0.5 rounded-md border border-[#B87503]/30">
-                          期限: {announcementMessage.deadline}
-                        </span>
-                      )}
+                      <span className="text-[10px] font-bold text-[#7A5726]">
+                        {progressAiResult.stageLabel}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 flex flex-col gap-1 text-xs">
+                      <p className="font-bold text-[#3D2406] leading-relaxed">
+                        {progressAiResult.summary}
+                      </p>
+                      <p className="text-[11px] text-[#7A5726] bg-[#FFFDF7] p-2 rounded-xl border border-[#B87503]/20">
+                        <strong>判定根拠（Own the Why）:</strong> {progressAiResult.scoreWhy}
+                      </p>
                     </div>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-[#3D2406] font-medium leading-relaxed bg-[#FFFDF7] p-3 rounded-xl border border-[#B87503]/20">
-                    {announcementMessage.text}
-                  </p>
+                  {/* 順調な点 ＆ ボトルネック ＆ 次の一歩 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+                    <div className="p-3 rounded-2xl bg-[#EDF7ED] border border-[#81C784]">
+                      <span className="font-bold text-[#1E4620] block mb-1">✓ 順調に進んでいる点</span>
+                      <ul className="list-disc list-inside text-[11px] text-[#1E4620] space-y-0.5">
+                        {progressAiResult.goodPoints.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
 
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="text-[#7A5726]">
-                      発信: {announcementMessage.senderName} ({announcementMessage.senderRole}) • {formatJSTDateTime(announcementMessage.createdAt)}
-                    </span>
+                    <div className="p-3 rounded-2xl bg-[#FDEAEA] border border-[#E57373]">
+                      <span className="font-bold text-[#5F1313] block mb-1">⚠ ボトルネック・不足点</span>
+                      <ul className="list-disc list-inside text-[11px] text-[#5F1313] space-y-0.5">
+                        {progressAiResult.bottlenecks.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
 
-                    {/* 「確認しました」ボタン */}
-                    {announcementMessage.confirmedUserUids.includes(user?.uid || "") ? (
-                      <span className="px-3 py-1 rounded-full bg-[#EDF7ED] text-[#1E4620] font-bold border border-[#81C784]">
-                        ✓ 確認済み
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmAnnouncement(announcementMessage.id)}
-                        className="px-4 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] font-bold shadow-xs hover:bg-[#E0A200] transition-colors"
-                      >
-                        確認しました
-                      </button>
-                    )}
+                    <div className="p-3 rounded-2xl bg-[#FFF8E1] border border-[#F5B301]">
+                      <span className="font-bold text-[#B87503] block mb-1">🚀 次に優先すべき一手</span>
+                      <ul className="list-disc list-inside text-[11px] text-[#3D2406] space-y-0.5">
+                        {progressAiResult.nextActions.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* チャットタイムライン（メッセージ一覧） */}
-              <div className="rounded-3xl border border-[#B87503]/30 bg-[#FFFBEB]/90 p-4 sm:p-6 min-h-[350px] max-h-[480px] overflow-y-auto flex flex-col gap-3 shadow-inner">
-                {chatMessages.length === 0 ? (
-                  <div className="py-16 text-center text-[#7A5726] font-medium">
-                    まだメッセージはありません。最初の発言を投稿してチーム作業を始めましょう！
-                  </div>
-                ) : (
-                  chatMessages.map((msg) => {
-                    const isSelf = user?.uid === msg.senderUid;
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${
-                          isSelf ? "self-end items-end" : "self-start items-start"
+              {progressAiError && (
+                <div className="p-3 rounded-xl bg-[#FDEAEA] border border-[#E57373] text-[#5F1313] text-xs font-bold">
+                  ⚠ {progressAiError}
+                </div>
+              )}
+
+              {/* チャットサブタブの表示 */}
+              {workspaceSubTab === "chat" && (
+                <>
+                  {/* ルーム切り替えタブ */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                    {[
+                      { id: "general", label: "全体チャット" },
+                      { id: "task-analysis", label: "タスク: 解析パイプライン" },
+                      { id: "task-poster", label: "タスク: ポスター制作" },
+                    ].map((room) => (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => setActiveChatRoomId(room.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                          activeChatRoomId === room.id
+                            ? "bg-[#F5B301] text-[#3D2406] shadow-xs border border-[#E0A200]"
+                            : "bg-[#FFFBEB] text-[#5C3D15] hover:bg-[#FFF8E1] border border-[#B87503]/25"
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 text-[10px] text-[#7A5726]">
-                          <span className="font-bold text-[#3D2406]">
-                            {isSelf ? "あなた" : msg.senderName}
-                          </span>
-                          <span>•</span>
-                          <span>{msg.senderSchool || msg.senderRole}</span>
-                          <span>•</span>
-                          <span>{formatJSTDateTime(msg.createdAt)}</span>
-                        </div>
+                        {room.label}
+                      </button>
+                    ))}
+                  </div>
 
-                        <div
-                          className={`p-3 rounded-2xl text-xs sm:text-sm font-medium leading-relaxed break-words shadow-xs ${
-                            isSelf
-                              ? "bg-[#F5B301] text-[#3D2406] rounded-br-xs"
-                              : "bg-[#FFFDF7] text-[#3D2406] border border-[#B87503]/25 rounded-bl-xs"
-                          }`}
-                        >
-                          {msg.text}
+                  {/* 固定表示の「全体連絡」 */}
+                  {announcementMessage && (
+                    <div className="p-4 rounded-2xl bg-[#FFF4CA] border-2 border-[#F5B301] shadow-md flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-[#B87503] flex items-center gap-1.5">
+                          <span>📢</span>
+                          <span>進行役からの全体連絡（重要）</span>
+                        </span>
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#3D2406]">
+                          <span>
+                            確認済み: {announcementMessage.confirmedUserUids.length} / {announcementMessage.totalMembersCount || 3} 人
+                          </span>
+                          {announcementMessage.deadline && (
+                            <span className="text-[10px] text-[#7A5726] bg-[#FFFBEB] px-2 py-0.5 rounded-md border border-[#B87503]/30">
+                              期限: {announcementMessage.deadline}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
 
-              {/* メッセージ入力欄（仕様: 全体連絡として出す、送信） */}
-              <form
-                onSubmit={handleSendMessage}
-                className="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-2.5"
-              >
-                <div className="flex items-center gap-3 text-xs">
-                  <label className="flex items-center gap-1.5 font-bold text-[#3D2406] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={chatIsAnnouncement}
-                      onChange={(e) => setChatIsAnnouncement(e.target.checked)}
-                      className="rounded accent-[#F5B301]"
-                    />
-                    <span>全体連絡として出す（進行役向け・上部に固定表示）</span>
-                  </label>
+                      <p className="text-xs sm:text-sm text-[#3D2406] font-medium leading-relaxed bg-[#FFFDF7] p-3 rounded-xl border border-[#B87503]/20">
+                        {announcementMessage.text}
+                      </p>
 
-                  {chatIsAnnouncement && (
-                    <div className="flex items-center gap-1 ml-auto">
-                      <span className="text-[11px] text-[#7A5726]">確認期限:</span>
-                      <input
-                        type="date"
-                        value={chatDeadline}
-                        onChange={(e) => setChatDeadline(e.target.value)}
-                        className="p-1 border border-[#B87503]/30 rounded-lg bg-white text-xs"
-                      />
+                      <div className="flex items-center justify-between text-[11px] pt-1">
+                        <span className="text-[#7A5726]">
+                          発信: {announcementMessage.senderName} ({announcementMessage.senderRole}) • {formatJSTDateTime(announcementMessage.createdAt)}
+                        </span>
+
+                        {announcementMessage.confirmedUserUids.includes(user?.uid || "") ? (
+                          <span className="px-3 py-1 rounded-full bg-[#EDF7ED] text-[#1E4620] font-bold border border-[#81C784]">
+                            ✓ 確認済み
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmAnnouncement(announcementMessage.id)}
+                            className="px-4 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] font-bold shadow-xs hover:bg-[#E0A200] transition-colors"
+                          >
+                            確認しました
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    required
-                    placeholder={
-                      chatIsAnnouncement
-                        ? "全員に周知したい重要連絡を入力してください..."
-                        : "メッセージを入力..."
-                    }
-                    value={chatInputText}
-                    onChange={(e) => setChatInputText(e.target.value)}
-                    className="flex-1 bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#3D2406] focus:outline-none focus:border-[#F5B301]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSendingChat}
-                    className="px-5 py-2 rounded-xl bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs disabled:opacity-50"
+                  {/* チャットタイムライン */}
+                  <div className="rounded-3xl border border-[#B87503]/30 bg-[#FFFBEB]/90 p-4 sm:p-6 min-h-[350px] max-h-[480px] overflow-y-auto flex flex-col gap-3 shadow-inner">
+                    {chatMessages.length === 0 ? (
+                      <div className="py-16 text-center text-[#7A5726] font-medium">
+                        まだメッセージはありません。最初の発言を投稿してチーム作業を始めましょう！
+                      </div>
+                    ) : (
+                      chatMessages.map((msg) => {
+                        const isSelf = user?.uid === msg.senderUid;
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${
+                              isSelf ? "self-end items-end" : "self-start items-start"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#7A5726]">
+                              <span className="font-bold text-[#3D2406]">
+                                {isSelf ? "あなた" : msg.senderName}
+                              </span>
+                              <span>•</span>
+                              <span>{msg.senderSchool || msg.senderRole}</span>
+                              <span>•</span>
+                              <span>{formatJSTDateTime(msg.createdAt)}</span>
+                            </div>
+
+                            <div
+                              className={`p-3 rounded-2xl text-xs sm:text-sm font-medium leading-relaxed break-words shadow-xs ${
+                                isSelf
+                                  ? "bg-[#F5B301] text-[#3D2406] rounded-br-xs"
+                                  : "bg-[#FFFDF7] text-[#3D2406] border border-[#B87503]/25 rounded-bl-xs"
+                              }`}
+                            >
+                              {msg.text}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* メッセージ入力欄 */}
+                  <form
+                    onSubmit={handleSendMessage}
+                    className="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#B87503]/30 shadow-xs flex flex-col gap-2.5"
                   >
-                    {isSendingChat ? "送信中..." : "送信 🚀"}
-                  </button>
+                    <div className="flex items-center gap-3 text-xs">
+                      <label className="flex items-center gap-1.5 font-bold text-[#3D2406] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={chatIsAnnouncement}
+                          onChange={(e) => setChatIsAnnouncement(e.target.checked)}
+                          className="rounded accent-[#F5B301]"
+                        />
+                        <span>全体連絡として出す（進行役向け・上部に固定表示）</span>
+                      </label>
+
+                      {chatIsAnnouncement && (
+                        <div className="flex items-center gap-1 ml-auto">
+                          <span className="text-[11px] text-[#7A5726]">確認期限:</span>
+                          <input
+                            type="date"
+                            value={chatDeadline}
+                            onChange={(e) => setChatDeadline(e.target.value)}
+                            className="p-1 border border-[#B87503]/30 rounded-lg bg-white text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder={
+                          chatIsAnnouncement
+                            ? "全員に周知したい重要連絡を入力してください..."
+                            : "メッセージを入力..."
+                        }
+                        value={chatInputText}
+                        onChange={(e) => setChatInputText(e.target.value)}
+                        className="flex-1 bg-[#FFFDF7] border border-[#B87503]/30 rounded-xl px-3 py-2 text-xs sm:text-sm text-[#3D2406] focus:outline-none focus:border-[#F5B301]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSendingChat}
+                        className="px-5 py-2 rounded-xl bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs disabled:opacity-50"
+                      >
+                        {isSendingChat ? "送信中..." : "送信 🚀"}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+
+              {/* 共有ファイルサブタブ (W07) */}
+              {workspaceSubTab === "files" && (
+                <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#3D2406]">共有ファイル一覧（W07）</span>
+                    <button
+                      type="button"
+                      onClick={() => alert("ファイルアップロード機能: 企画書やCADデータなどを追加できます。")}
+                      className="px-3.5 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold"
+                    >
+                      ＋ ファイルを共有
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {[
+                      { name: "プロジェクト構想書_第1版.pdf", size: "1.2 MB", uploader: "田中 健太", time: "昨日" },
+                      { name: "試作ホップ配合データ.xlsx", size: "480 KB", uploader: "佐藤 澪", time: "2日前" },
+                      { name: "ラベルデザイン案_モック.fig", size: "3.4 MB", uploader: "鈴木 結愛", time: "3日前" },
+                    ].map((f, i) => (
+                      <div key={i} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-[#3D2406] block">{f.name}</span>
+                          <span className="text-[10px] text-[#7A5726]">{f.size} • 投稿: {f.uploader}</span>
+                        </div>
+                        <span className="text-xs text-[#B87503] font-bold">📥 開く</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </form>
+              )}
+
+              {/* 空き時間重ね合わせサブタブ (W08) */}
+              {workspaceSubTab === "calendar" && (
+                <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#3D2406]">メンバーの空き時間ヒートマップ（W08）</span>
+                    <span className="text-[11px] text-[#1E4620] bg-[#EDF7ED] px-2 py-0.5 rounded-full border border-[#81C784]">
+                      緑が濃い時間帯ほど全員が参加可能
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 text-xs">
+                    <div className="grid grid-cols-6 gap-2 text-center font-bold text-[#3D2406]">
+                      <span>時限</span>
+                      <span>月</span>
+                      <span>火</span>
+                      <span>水</span>
+                      <span>木</span>
+                      <span>金</span>
+                    </div>
+                    {[1, 2, 3, 4, 5].map((slot) => (
+                      <div key={slot} className="grid grid-cols-6 gap-2 text-center text-[11px] mt-2">
+                        <span className="font-bold text-[#7A5726]">{slot}限</span>
+                        <span className="p-2 rounded-lg bg-[#C8E6C9] font-bold text-[#1E4620]">4人空き</span>
+                        <span className="p-2 rounded-lg bg-[#FFFBEB] text-[#7A5726]">1人</span>
+                        <span className="p-2 rounded-lg bg-[#A5D6A7] font-bold text-[#1E4620]">全員OK!</span>
+                        <span className="p-2 rounded-lg bg-[#FFFBEB] text-[#7A5726]">2人</span>
+                        <span className="p-2 rounded-lg bg-[#C8E6C9] font-bold text-[#1E4620]">4人空き</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* メンバーと引継ぎサブタブ (W09) */}
+              {workspaceSubTab === "members" && (
+                <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#3D2406]">参加メンバーと役割一覧（W09）</span>
+                    <button
+                      type="button"
+                      onClick={() => alert("AI引継ぎ要約: 抜ける人の作業内容と未完了タスクをGeminiが自動要約します。")}
+                      className="px-3.5 py-1.5 rounded-full bg-[#FFF8E1] border border-[#B87503] text-[#3D2406] text-xs font-bold"
+                    >
+                      🤖 AI引継ぎ要約
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {[
+                      { name: "田中 健太", school: "東京農工大学 農学部", role: "発酵・醸造エンジニア", isFacil: false },
+                      { name: "鈴木 結愛", school: "早稲田大学 基幹理工学部", role: "進行役・フロントエンド", isFacil: true },
+                      { name: "佐藤 澪", school: "武蔵野美術大学 造形構想学部", role: "プロダクトデザイナー", isFacil: false },
+                      { name: "渡辺 航", school: "一橋大学 商学部", role: "ビジネスプランナー", isFacil: false },
+                    ].map((m, i) => (
+                      <div key={i} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-[#3D2406]">{m.name}</span>
+                            {m.isFacil && (
+                              <span className="px-1.5 py-0.2 rounded-md bg-[#F5B301] text-[#3D2406] text-[10px] font-bold">
+                                進行役
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-[#7A5726]">{m.school}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] font-bold text-[10px]">
+                          {m.role}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* ──────────────── 他のタブ ──────────────── */}
-          {activeNav === "profile" && (
-            <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
-              <span className="text-3xl">🌿</span>
-              <h2 className="text-lg font-bold text-[#3D2406]">W03 プロフィールとスキルツリー</h2>
-              <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-                あなたのスキル枝（審査済み・審査中・次に伸ばせる枝）や段位ランク、空き時間カレンダーを表示します。
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="mt-2 px-5 py-2 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs"
-              >
-                学校・時間割の再設定
-              </button>
-            </div>
-          )}
-
-          {activeNav === "submit" && (
-            <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
-              <span className="text-3xl">📝</span>
-              <h2 className="text-lg font-bold text-[#3D2406]">W05 申請・公開</h2>
-              <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-                新しいスキル枝の審査申請（根拠の提出）や、新規プロジェクトの公開申請を行います。
-              </p>
-            </div>
-          )}
-
+          {/* ──────────────── 活動記録認定 ──────────────── */}
           {activeNav === "records" && (
             <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
               <span className="text-3xl">🏆</span>
-              <h2 className="text-lg font-bold text-[#3D2406]">活動記録</h2>
+              <h2 className="text-lg font-bold text-[#3D2406]">活動記録の認定（A04）</h2>
               <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
-                完了したプロジェクトの活動記録や、運営からの認定実績を管理・公開します。
+                完了したプロジェクトの活動実績（何を話し合い、何を作ったか）が運営により認定され、あなたの公式実績としてPDFやQRコード付きで証明されます。
               </p>
             </div>
           )}
