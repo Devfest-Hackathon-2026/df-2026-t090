@@ -586,7 +586,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setSubmitSuccessMessage("新規プロジェクトを提唱しました！運営による公開審査（A03）へ進みます。");
+      setSubmitSuccessMessage("新規プロジェクトを提唱しました！運営による公開審査へ進みます。");
       setNewPjTitle("");
       setNewPjGoal("");
       setNewPjReason("");
@@ -718,12 +718,12 @@ export default function Home() {
                 大学・高専を越えるプロジェクト共創プラットフォーム
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] mt-0.5">
-                {activeNav === "home" && "W01 ホーム（合うプロジェクト）"}
-                {activeNav === "profile" && "W03 プロフィールと放射状スキルツリー"}
-                {activeNav === "scout" && "W04 スカウト・届いた応募"}
-                {activeNav === "submit" && "W05 申請・公開（スキル＆プロジェクト）"}
+                {activeNav === "home" && "ホーム（おすすめプロジェクト）"}
+                {activeNav === "profile" && "プロフィールと放射状スキルツリー"}
+                {activeNav === "scout" && "スカウト・届いた応募"}
+                {activeNav === "submit" && "申請・公開（スキル＆プロジェクト）"}
                 {activeNav === "records" && "活動記録認定"}
-                {activeNav.startsWith("workspace") && "W06 プロジェクト作業画面（チャット・AI進行度測定）"}
+                {activeNav.startsWith("workspace") && "プロジェクト作業画面（チャット・AI進行度測定）"}
               </h1>
             </div>
 
@@ -1451,9 +1451,9 @@ export default function Home() {
                   className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503]/30 shadow-xs flex flex-col gap-4"
                 >
                   <div>
-                    <h3 className="text-base font-black text-[#3D2406]">スキルの枝の審査申請（W05前半）</h3>
+                    <h3 className="text-base font-black text-[#3D2406]">スキルの枝の審査申請</h3>
                     <p className="text-xs text-[#7A5726] mt-0.5">
-                      学内での講義・実験や個人開発・資格などの根拠を提出し、運営の審査（A02）を受けます。
+                      学内での講義・実験や個人開発・資格などの根拠を提出し、運営の審査を受けます。
                     </p>
                   </div>
 
@@ -1550,7 +1550,7 @@ export default function Home() {
                   className="p-6 sm:p-8 rounded-3xl bg-[#FFFBEB] border-2 border-[#B87503]/30 shadow-xs flex flex-col gap-4"
                 >
                   <div>
-                    <h3 className="text-base font-black text-[#3D2406]">新規プロジェクトの提唱（W05後半）</h3>
+                    <h3 className="text-base font-black text-[#3D2406]">新規プロジェクトの提唱</h3>
                     <p className="text-xs text-[#7A5726] mt-0.5">
                       自大学だけでは実現できないアイデアを提唱し、他大学の専門スキルを持つ仲間を公募します。
                     </p>
@@ -1647,7 +1647,7 @@ export default function Home() {
                       プロジェクト作業画面
                     </h2>
                     <span className="text-xs text-[#7A5726]">
-                      共創チーム作業スペース（W06 チャット / W07 ファイル / W08 空き時間 / W09 メンバー）
+                      共創チーム作業スペース（チャット / ファイル / 空き時間 / メンバー）
                     </span>
                   </div>
                 </div>
@@ -1675,13 +1675,13 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* サブタブ（チャット、ファイル、予定空き時間、メンバー引継ぎ） */}
+              {/* サブタブ（チャット、ファイル、予定空き時間、メンバー） */}
               <div className="flex items-center gap-2 border-b border-[#B87503]/20 pb-2">
                 {[
                   { id: "chat", label: "💬 チャット" },
-                  { id: "files", label: "📁 共有ファイル (W07)" },
-                  { id: "calendar", label: "📅 空き時間重ね合わせ (W08)" },
-                  { id: "members", label: "👥 メンバーと引継ぎ (W09)" },
+                  { id: "files", label: "📁 共有ファイル" },
+                  { id: "calendar", label: "📅 空き時間重ね合わせ" },
+                  { id: "members", label: "👥 メンバー一覧" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -1940,11 +1940,11 @@ export default function Home() {
                 </>
               )}
 
-              {/* 共有ファイルサブタブ (W07) */}
+              {/* 共有ファイルサブタブ */}
               {workspaceSubTab === "files" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#3D2406]">共有ファイル一覧（W07）</span>
+                    <span className="font-bold text-xs text-[#3D2406]">共有ファイル一覧</span>
                     <button
                       type="button"
                       onClick={() => alert("ファイルアップロード機能: 企画書やCADデータなどを追加できます。")}
@@ -1971,11 +1971,11 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 空き時間重ね合わせサブタブ (W08) */}
+              {/* 空き時間重ね合わせサブタブ */}
               {workspaceSubTab === "calendar" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#3D2406]">メンバーの空き時間ヒートマップ（W08）</span>
+                    <span className="font-bold text-xs text-[#3D2406]">メンバーの空き時間ヒートマップ</span>
                     <span className="text-[11px] text-[#1E4620] bg-[#EDF7ED] px-2 py-0.5 rounded-full border border-[#81C784]">
                       緑が濃い時間帯ほど全員が参加可能
                     </span>
@@ -2003,18 +2003,11 @@ export default function Home() {
                 </div>
               )}
 
-              {/* メンバーと引継ぎサブタブ (W09) */}
+              {/* メンバー一覧サブタブ */}
               {workspaceSubTab === "members" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#3D2406]">参加メンバーと役割一覧（W09）</span>
-                    <button
-                      type="button"
-                      onClick={() => alert("AI引継ぎ要約: 抜ける人の作業内容と未完了タスクをGeminiが自動要約します。")}
-                      className="px-3.5 py-1.5 rounded-full bg-[#FFF8E1] border border-[#B87503] text-[#3D2406] text-xs font-bold"
-                    >
-                      🤖 AI引継ぎ要約
-                    </button>
+                    <span className="font-bold text-xs text-[#3D2406]">参加メンバーと役割一覧</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -2051,7 +2044,7 @@ export default function Home() {
           {activeNav === "records" && (
             <div className="p-8 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 text-center flex flex-col items-center gap-3">
               <span className="text-3xl">🏆</span>
-              <h2 className="text-lg font-bold text-[#3D2406]">活動記録の認定（A04）</h2>
+              <h2 className="text-lg font-bold text-[#3D2406]">活動記録の認定</h2>
               <p className="text-xs text-[#5C3D15] max-w-md leading-relaxed">
                 完了したプロジェクトの活動実績（何を話し合い、何を作ったか）が運営により認定され、あなたの公式実績としてPDFやQRコード付きで証明されます。
               </p>

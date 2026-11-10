@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>👥</span>
-            <span>A06 利用者の管理</span>
+            <span>利用者の管理</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             学生および運営アカウントの一覧、所属学校、運営の印の付け外しを管理します。
@@ -355,7 +355,7 @@ export default function AdminUsersPage() {
               <>
                 <p className="text-xs text-[#5C3D15] leading-relaxed">
                   {selectedUser.isAdmin
-                    ? "このユーザーの運営の印を外して「一般学生」に戻します。操作内容は A09 操作の記録 に自動保存されます。"
+                    ? "このユーザーの運営の印を外して「一般学生」に戻します。操作内容は 操作の記録（監査ログ） に自動保存されます。"
                     : "このユーザーに運営の印を付与して「本部運営」にします。管理画面の全機能が開放されます。"}
                 </p>
 

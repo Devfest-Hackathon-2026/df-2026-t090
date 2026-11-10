@@ -99,7 +99,7 @@ export default function AdminInboxPage() {
       <div className="border-b border-[#B87503]/30 pb-4">
         <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
           <span>📥</span>
-          <span>A01 審査の受付箱</span>
+          <span>審査の受付箱</span>
         </h1>
         <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
           学生から届いたスキル申請、プロジェクト公開申請、活動記録認定の審査待ち一覧です（目安: 3日以内）。

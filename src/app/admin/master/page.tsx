@@ -237,7 +237,7 @@ export default function AdminMasterPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>📚</span>
-            <span>A07 学校とスキルの一覧</span>
+            <span>学校とスキルの一覧</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             スキルツリーの分野とスキルの定義、大学・高専マスターおよび追加依頼を管理します。
@@ -505,7 +505,7 @@ export default function AdminMasterPage() {
         <div className="fixed inset-0 z-50 bg-[#3D2406]/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#FFFBEB] max-w-lg w-full rounded-3xl p-6 border-2 border-[#B87503] shadow-2xl flex flex-col gap-4 text-left">
             <h3 className="text-base sm:text-lg font-black text-[#3D2406] border-b border-[#B87503]/30 pb-2">
-              スキルの編集（A07）
+              スキルの編集
             </h3>
 
             <div className="flex flex-col gap-3 text-xs">
@@ -597,7 +597,7 @@ export default function AdminMasterPage() {
             className="bg-[#FFFBEB] max-w-lg w-full rounded-3xl p-6 border-2 border-[#B87503] shadow-2xl flex flex-col gap-4 text-left"
           >
             <h3 className="text-base font-black text-[#3D2406] border-b border-[#B87503]/30 pb-2">
-              スキルを新規登録（A07）
+              スキルを新規登録
             </h3>
 
             <div className="flex flex-col gap-3 text-xs">

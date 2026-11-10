@@ -9,7 +9,7 @@ export default function AnnouncementsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>📢</span>
-            <span>A08 お知らせの配信</span>
+            <span>お知らせの配信</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             メンテナンス・新機能・大切なお願い・イベントを配信します。全員宛てのお知らせは運営2人確認を経て配信されます。

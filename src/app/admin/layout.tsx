@@ -62,15 +62,15 @@ export default function AdminLayout({
   }, []);
 
   const adminNav = [
-    { label: "A01 審査の受付箱", href: "/admin" },
-    { label: "A02 スキル申請審査", href: "/admin/skills-review" },
-    { label: "A03 プロジェクト公開審査", href: "/admin/projects-review" },
-    { label: "A04 活動記録の認定", href: "/admin/records-cert" },
-    { label: "A05 通報への対応", href: "/admin/reports" },
-    { label: "A06 利用者の管理", href: "/admin/users" },
-    { label: "A07 学校とスキル", href: "/admin/master" },
-    { label: "A08 お知らせの配信", href: "/admin/announcements" },
-    { label: "A09 操作の記録", href: "/admin/audit-logs" },
+    { label: "審査の受付箱", href: "/admin" },
+    { label: "スキル申請審査", href: "/admin/skills-review" },
+    { label: "プロジェクト公開審査", href: "/admin/projects-review" },
+    { label: "活動記録の認定", href: "/admin/records-cert" },
+    { label: "通報への対応", href: "/admin/reports" },
+    { label: "利用者の管理", href: "/admin/users" },
+    { label: "学校とスキル", href: "/admin/master" },
+    { label: "お知らせの配信", href: "/admin/announcements" },
+    { label: "操作の記録", href: "/admin/audit-logs" },
   ];
 
   if (loading) {
@@ -92,7 +92,7 @@ export default function AdminLayout({
           <span className="text-4xl">🛡️</span>
           <h1 className="text-xl font-black text-[#3D2406]">HIVE 運営管理画面</h1>
           <p className="text-sm text-[#5C3D15] leading-relaxed">
-            審査の受付箱（A01）、利用者の管理（A06）、学校・スキル一覧（A07）、操作ログ（A09）を利用するには、運営アカウントでログインしてください。
+            審査の受付箱、利用者の管理、学校・スキル一覧、操作ログを利用するには、運営アカウントでログインしてください。
           </p>
           <button
             type="button"

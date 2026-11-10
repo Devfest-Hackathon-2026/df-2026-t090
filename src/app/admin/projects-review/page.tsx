@@ -98,7 +98,7 @@ export default function ProjectsReviewPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>🚀</span>
-            <span>A03 プロジェクト公開の審査</span>
+            <span>プロジェクト公開の審査</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             学生が提唱したプロジェクトの「在籍校だけでは実現できない理由」やロール・募集枝を確かめ、公開・差し戻しを判定します。

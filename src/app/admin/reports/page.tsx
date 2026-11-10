@@ -9,7 +9,7 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>🚨</span>
-            <span>A05 通報への対応</span>
+            <span>通報への対応</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             チャットやプロジェクトに対する通報を24時間以内を目安に対応し、注意送信・非公開化・一時停止（2人確認）を管理します。

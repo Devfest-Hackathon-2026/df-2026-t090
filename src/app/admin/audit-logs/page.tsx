@@ -117,7 +117,7 @@ export default function AdminAuditLogsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>📜</span>
-            <span>A09 操作の記録</span>
+            <span>操作の記録（監査ログ）</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             運営が行ったすべての操作ログです。追記のみで記録され、誰も書き換えや削除はできません。

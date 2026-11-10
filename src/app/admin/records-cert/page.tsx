@@ -9,7 +9,7 @@ export default function RecordsCertPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>🏆</span>
-            <span>A04 活動記録の認定</span>
+            <span>活動記録の認定</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             終了したプロジェクトの成果物と活動記録を確かめ、参加メンバーのプロフィールに公式認定を付与します。

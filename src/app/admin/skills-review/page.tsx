@@ -114,7 +114,7 @@ export default function SkillsReviewPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] flex items-center gap-2">
             <span>🔍</span>
-            <span>A02 スキル申請の審査</span>
+            <span>スキル申請の審査</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#5C3D15] mt-1">
             学生から提出されたスキルの枝と根拠を審査し、スキルツリーに反映・追加根拠要請・見送りを判定します。
