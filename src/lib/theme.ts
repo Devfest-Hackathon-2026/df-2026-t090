@@ -111,3 +111,14 @@ export function formatJSTDateOnly(isoString: string | null | undefined): string 
     return "-";
   }
 }
+
+/**
+ * メールアドレスの伏字化ユーティリティ（例: s***@gmail.com）
+ */
+export function maskEmail(email: string | null | undefined): string {
+  if (!email || !email.includes("@")) return "-";
+  const [localPart, domain] = email.split("@");
+  if (!localPart) return `***@${domain}`;
+  const firstChar = localPart[0];
+  return `${firstChar}***@${domain}`;
+}

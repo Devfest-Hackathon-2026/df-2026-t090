@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { formatJSTDateTime } from "@/lib/theme";
+import { formatJSTDateTime, maskEmail } from "@/lib/theme";
 
 interface AdminUserItem {
   uid: string;
@@ -271,7 +271,7 @@ export default function AdminUsersPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[#7A5726] mt-0.5">{u.email || "-"}</div>
+                      <div className="text-[11px] text-[#7A5726] mt-0.5">{maskEmail(u.email)}</div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-bold text-[#3D2406]">{u.schoolName}</div>

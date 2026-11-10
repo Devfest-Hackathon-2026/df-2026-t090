@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { UserProfile } from "@/lib/types/hive";
+import { maskEmail } from "@/lib/theme";
 
 export default function AdminLayout({
   children,
@@ -120,59 +121,14 @@ export default function AdminLayout({
     );
   }
 
-  // ログイン済みだが運営の印（admin）がない場合（開発・デモ用ワンクリック有効化）
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-[#FFFDF7] flex flex-col items-center justify-center p-4 text-[#3D2406]">
-        <div className="max-w-md w-full bg-[#FFFBEB] p-8 rounded-3xl border-2 border-[#F5B301] shadow-lg text-center flex flex-col items-center gap-4">
-          <span className="text-4xl">⚠️</span>
-          <h1 className="text-xl font-black text-[#3D2406]">運営権限の有効化</h1>
-          <p className="text-sm text-[#5C3D15] leading-relaxed">
-            現在のアカウント（{user.displayName || user.email}）には運営の印（admin）がまだ紐付いていません。
-          </p>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const token = await user.getIdToken();
-                const res = await fetch("/api/auth/me", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    email: user.email,
-                    displayName: user.displayName,
-                    grantAdmin: true,
-                  }),
-                });
-                if (res.ok) {
-                  window.location.reload();
-                } else {
-                  alert("権限の有効化に失敗しました。");
-                }
-              } catch {
-                alert("通信エラーが発生しました。");
-              }
-            }}
-            className="w-full py-3 px-6 rounded-full bg-[#F5B301] text-[#3D2406] text-sm font-bold shadow-md hover:bg-[#E0A200] transition-all"
-          >
-            このアカウントに運営権限（Admin）を付与して入場 🚀
-          </button>
-          <Link
-            href="/"
-            className="text-xs text-[#7A5726] hover:underline mt-2 font-medium"
-          >
-            ← 学生向け画面へ戻る
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#FFFDF7] text-[#3D2406] flex flex-col">
+      {/* 審査用全開放案内バナー */}
+      <div className="bg-[#FFF4CA] border-b-2 border-[#F5B301] px-4 py-2.5 text-center text-xs sm:text-sm font-bold text-[#3D2406] flex items-center justify-center gap-2 shadow-2xs">
+        <span>🛡️</span>
+        <span>審査用に、ログインした全員が運営の機能を使えるようにしています</span>
+      </div>
+
       {/* 運営専用ヘッダー */}
       <header className="sticky top-0 z-30 bg-[#FFFBEB]/95 backdrop-blur-md border-b border-[#B87503]/30 shadow-xs px-4 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
@@ -185,7 +141,7 @@ export default function AdminLayout({
               <span className="font-black text-lg tracking-wider text-[#3D2406]">HIVE 運営管理</span>
             </Link>
             <span className="px-2.5 py-0.5 rounded-full bg-[#F5B301]/20 text-[#B87503] border border-[#B87503]/40 text-xs font-bold">
-              本部Admin
+              審査用Admin開放中
             </span>
           </div>
 
@@ -204,9 +160,9 @@ export default function AdminLayout({
           {/* 右側: 運営者名 ＆ 学生画面への切り替えボタン */}
           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
             <div className="text-right hidden sm:block">
-              <span className="text-[11px] text-[#7A5726] block font-medium">ログイン中（運営）</span>
+              <span className="text-[11px] text-[#7A5726] block font-medium">ログイン中（審査用運営）</span>
               <span className="text-xs font-bold text-[#3D2406]">
-                {profile?.displayName || user.displayName || user.email}
+                {profile?.displayName || user.displayName || maskEmail(user.email)}
               </span>
             </div>
             <Link

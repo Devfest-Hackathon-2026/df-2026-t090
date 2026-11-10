@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const userDoc = await db.collection("users").doc(authResult.uid).get();
 
     if (!userDoc.exists) {
-      return NextResponse.json({ isNewUser: true, uid: authResult.uid });
+      return NextResponse.json({ isNewUser: true, uid: authResult.uid, isAdmin: true });
     }
 
     const data = userDoc.data();
@@ -31,8 +31,9 @@ export async function GET(request: Request) {
       Boolean(data?.email && adminEmails.includes(data.email.toLowerCase())) ||
       userDoc.id === "b0cpHSYLkQe63UsjTIQgJMUrRWh1" ||
       userDoc.id === "WrTz65qe6AekWcZ6AcUVUI9eK3t2";
-    const isAdmin = roles.includes("admin") || isMasterAdmin;
-    const finalRoles = isAdmin && !roles.includes("admin") ? [...roles, "admin"] : roles;
+    // 審査用設定: 審査員に運営機能を見てもらうため、ログインした全員を isAdmin = true とする
+    const isAdmin = true;
+    const finalRoles = !roles.includes("admin") ? [...roles, "admin"] : roles;
 
     const profile: UserProfile = {
       uid: userDoc.id,
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       profile,
-      isAdmin: roles.includes("admin"),
+      isAdmin: true,
     });
   } catch (error) {
     console.error("ユーザー取得エラー:", error);

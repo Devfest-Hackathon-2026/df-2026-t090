@@ -245,21 +245,23 @@ export default function StudentSidebar({
           </div>
         </div>
 
-        {/* フッターエリア: 運営管理画面リンク ＆ 初期設定リンク */}
+        {/* フッターエリア: 運営管理画面リンク ＆ バージョン */}
         <div className="pt-3 border-t border-[#B87503]/20 flex flex-col gap-2">
-          {/* 運営管理画面への切り替えリンク（常時表示し、クリックで管理画面へアクセス可能） */}
-          <Link
-            href="/admin"
-            className="min-h-[44px] w-full py-2.5 px-3 rounded-2xl bg-[#FFF8E1] border-2 border-[#F5B301] text-[#B87503] hover:bg-[#F5B301] hover:text-[#3D2406] text-xs font-black shadow-xs transition-all flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <span>🛡️</span>
-              <span>運営の管理画面へ</span>
-            </div>
-            <span className="text-[10px] bg-[#B87503] text-white px-1.5 py-0.2 rounded-md">
-              {isAdmin ? "Admin" : "管理"}
-            </span>
-          </Link>
+          {/* 運営管理画面への切り替えリンク（審査用設定: ログインしている全員に表示） */}
+          {user && (
+            <Link
+              href="/admin"
+              className="min-h-[44px] w-full py-2.5 px-3 rounded-2xl bg-[#FFF8E1] border-2 border-[#F5B301] text-[#B87503] hover:bg-[#F5B301] hover:text-[#3D2406] text-xs font-black shadow-xs transition-all flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <span>🛡️</span>
+                <span>運営の管理画面へ</span>
+              </div>
+              <span className="text-[10px] bg-[#B87503] text-white px-1.5 py-0.2 rounded-md">
+                Admin
+              </span>
+            </Link>
+          )}
 
           <div className="text-[10px] text-[#7A5726] text-center">
             HIVE v0.1 • 学生プロジェクト共創

@@ -28,7 +28,41 @@ export async function getAuthenticatedUser(
     const userDoc = await db.collection("users").doc(authResult.uid).get();
 
     if (!userDoc.exists) {
-      return null;
+      // 審査用設定: 審査員が新規Googleアカウントでログインした場合でも管理機能を使えるようフォールバック
+      const tempProfile: UserProfile = {
+        uid: authResult.uid,
+        email: "reviewer@student.example.com",
+        displayName: "審査員アカウント",
+        roles: ["admin", "student"],
+        status: "active",
+        schoolId: "",
+        schoolName: "審査用アカウント",
+        faculty: "",
+        department: "",
+        grade: "",
+        major: "",
+        mainRole: "審査員",
+        subRoles: [],
+        rank: {
+          title: "三段",
+          breakdown: { contribution: 5, trust: 5, cooperation: 5, sharing: 5 },
+          evaluationsCount: 1,
+        },
+        timetable: [],
+        googleCalendarSynced: false,
+        connections: { collaboratorsCount: 0, schoolsCount: 0, primaryPartners: [] },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+
+      return {
+        uid: authResult.uid,
+        email: tempProfile.email,
+        displayName: tempProfile.displayName,
+        profile: tempProfile,
+        isAdmin: true,
+      };
     }
 
     const data = userDoc.data();
@@ -40,8 +74,10 @@ export async function getAuthenticatedUser(
     const isMasterAdmin =
       Boolean(data?.email && adminEmails.includes(data.email.toLowerCase())) ||
       userDoc.id === "b0cpHSYLkQe63UsjTIQgJMUrRWh1";
-    const isAdmin = roles.includes("admin") || isMasterAdmin;
-    const finalRoles = isAdmin && !roles.includes("admin") ? [...roles, "admin"] : roles;
+    // 審査用設定: 審査員に運営機能を見てもらうため、ログインした全員を isAdmin = true とする
+    // （本来の運用では roles.includes("admin") || isMasterAdmin のみ許可）
+    const isAdmin = true;
+    const finalRoles = !roles.includes("admin") ? [...roles, "admin"] : roles;
 
     const profile: UserProfile = {
       uid: userDoc.id,

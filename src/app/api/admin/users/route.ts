@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-guard";
 import { getAdminDb, FieldValue } from "@/lib/firebase-admin";
 import { recordAuditLog } from "@/lib/audit-logger";
+import { maskEmail } from "@/lib/theme";
 
 /**
  * GET /api/admin/users
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
       usersList.push({
         uid: doc.id,
         displayName: data?.displayName || "ユーザー",
-        email: data?.email || "",
+        email: maskEmail(data?.email),
         schoolName,
         faculty: data?.faculty || "",
         department: data?.department || "",
