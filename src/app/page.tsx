@@ -253,32 +253,119 @@ export default function Home() {
     return "★".repeat(Math.max(0, Math.min(5, rounded))) + "☆".repeat(Math.max(0, Math.min(5, 5 - rounded)));
   };
 
-  // プロフィール表示用: 関わったプロジェクト一覧
+  // プロジェクトメタデータ定義（過去完了プロジェクト＆進行中プロジェクト）
+  const ALL_KNOWN_PROJECTS = useMemo(() => [
+    {
+      id: "demo-idea-craft-beer",
+      title: "地域伝統クラフトビール開発",
+      defaultRole: "醸造データ解析・発酵プロセス管理",
+      period: "2026年9月 〜 進行中",
+      status: "進行中",
+      memberUids: ["student-male-tanaka", "student-male-watanabe", "student-female-sato", "student-female-matsumoto"],
+    },
+    {
+      id: "demo-idea-campus-map",
+      title: "学内空き教室リアルタイム共有",
+      defaultRole: "フロントエンドUI設計",
+      period: "2026年10月 〜 進行中",
+      status: "進行中",
+      memberUids: ["student-female-suzuki", "student-male-nakamura", "student-female-ito", "student-female-takahashi"],
+    },
+    {
+      id: "demo-completed-pj",
+      title: "放置竹林サステナブル照明 (第1期)",
+      defaultRole: "ハードウェア回路・センサ選定",
+      period: "2026年4月 〜 2026年8月",
+      status: "完了",
+      memberUids: ["student-male-yamamoto", "student-male-kobayashi", "student-female-sato", "student-male-watanabe"],
+    },
+    {
+      id: "past-pj-walking-assist",
+      title: "高齢者向け歩行アシストギア検証",
+      defaultRole: "アクセシビリティ・見守り調査",
+      period: "2025年4月 〜 2025年7月",
+      status: "完了",
+      memberUids: ["student-male-yamamoto", "student-male-kobayashi", "student-male-watanabe", "student-female-matsumoto"],
+    },
+    {
+      id: "past-pj-disaster-edu",
+      title: "地理情報連携防災教育デジタル教材",
+      defaultRole: "教育カリキュラム設計・UI開発",
+      period: "2025年6月 〜 2025年9月",
+      status: "完了",
+      memberUids: ["student-female-takahashi", "student-female-suzuki", "student-male-nakamura", "student-female-ito", "student-female-sato"],
+    },
+    {
+      id: "past-pj-agritech-event",
+      title: "食育体験型アグリテックイベント",
+      defaultRole: "発酵の解説・ワークショップ設計",
+      period: "2025年9月 〜 2025年12月",
+      status: "完了",
+      memberUids: ["student-male-tanaka", "student-female-takahashi", "student-male-yamamoto", "student-male-watanabe"],
+    },
+    {
+      id: "past-pj-wheelchair-nav",
+      title: "学内車椅子ナビゲーションアプリ",
+      defaultRole: "バリアフリーの実態調査・画面開発",
+      period: "2025年11月 〜 2026年2月",
+      status: "完了",
+      memberUids: ["student-male-kobayashi", "student-female-suzuki", "student-male-nakamura", "student-female-sato", "student-female-matsumoto"],
+    },
+    {
+      id: "past-pj-craft-archive",
+      title: "伝統工芸デジタルアーカイブ・WEB展覧会",
+      defaultRole: "Webデザイン・閲覧データ分析",
+      period: "2026年1月 〜 2026年4月",
+      status: "完了",
+      memberUids: ["student-female-sato", "student-female-suzuki", "student-female-ito", "student-male-watanabe", "student-female-matsumoto"],
+    },
+    {
+      id: "past-pj-remote-study",
+      title: "リモート学習集中度モニタリングツール",
+      defaultRole: "実験データの整理・テスト受講",
+      period: "2026年3月 〜 2026年6月",
+      status: "完了",
+      memberUids: ["student-female-ito", "student-female-takahashi", "student-male-nakamura", "student-male-tanaka"],
+    },
+    {
+      id: "past-pj-fruit-drink",
+      title: "規格外果実の清涼飲料水商品化マーケティング",
+      defaultRole: "果汁の成分分析・製造会社調整",
+      period: "2026年5月 〜 2026年8月",
+      status: "完了",
+      memberUids: ["student-male-tanaka", "student-male-watanabe", "student-female-matsumoto", "student-male-kobayashi"],
+    },
+  ], []);
+
+  // プロフィール表示用: 関わったプロジェクト一覧（動的抽出）
   const participatedProjects = useMemo(() => {
-    return [
-      {
-        id: "demo-completed-pj",
-        title: "放置竹林サステナブル照明 (第1期)",
-        roleName: profile?.mainRole || "ハードウェア回路・センサ選定",
-        period: "2026年4月 〜 2026年8月",
-        status: "完了",
-      },
-      {
-        id: "demo-idea-craft-beer",
-        title: "地域伝統クラフトビール開発",
-        roleName: "醸造データ解析・発酵プロセス管理",
-        period: "2026年9月 〜 進行中",
-        status: "進行中",
-      },
-      {
-        id: "demo-idea-campus-map",
-        title: "学内空き教室リアルタイム共有",
-        roleName: "フロントエンドUI設計",
-        period: "2026年10月 〜 進行中",
-        status: "進行中",
-      },
-    ];
-  }, [profile]);
+    const joinedIds = new Set(profile?.joinedProjectIds || []);
+    const uid = profile?.uid || user?.uid || "";
+
+    const matched = ALL_KNOWN_PROJECTS.filter((p) => {
+      if (joinedIds.has(p.id)) return true;
+      if (uid && p.memberUids.includes(uid)) return true;
+      return false;
+    });
+
+    if (matched.length > 0) {
+      return matched.map((p) => ({
+        id: p.id,
+        title: p.title,
+        roleName: profile?.mainRole && p.status === "進行中" ? profile.mainRole : p.defaultRole,
+        period: p.period,
+        status: p.status,
+      }));
+    }
+
+    return ALL_KNOWN_PROJECTS.slice(0, 3).map((p) => ({
+      id: p.id,
+      title: p.title,
+      roleName: p.defaultRole,
+      period: p.period,
+      status: p.status,
+    }));
+  }, [profile, user, ALL_KNOWN_PROJECTS]);
   // スキル申請
   const [newSkillName, setNewSkillName] = useState<string>("");
   const [newSkillCategory, setNewSkillCategory] = useState<string>("cat-it-programming");

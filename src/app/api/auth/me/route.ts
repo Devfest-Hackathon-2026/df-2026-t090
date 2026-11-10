@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       major: data?.major || "",
       mainRole: data?.mainRole || "",
       subRoles: Array.isArray(data?.subRoles) ? data.subRoles : [],
+      joinedProjectIds: Array.isArray(data?.joinedProjectIds) ? data.joinedProjectIds : [],
       rank: data?.rank || {
         title: "初段",
         breakdown: { contribution: 4, trust: 4, cooperation: 4, sharing: 4 },

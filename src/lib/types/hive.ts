@@ -73,6 +73,7 @@ export interface UserProfile {
   major: string;       // 専攻・専門
   mainRole: string;    // メインの役職
   subRoles: string[];  // その他の役職
+  joinedProjectIds?: string[]; // 参加・関わったプロジェクトID一覧
   rank: UserRank;
   timetable: TimetableSlot[];
   googleCalendarSynced: boolean;
