@@ -1568,7 +1568,7 @@ export default function Home() {
           <div className="hidden md:flex items-center justify-between pb-4 mb-6 border-b border-[#B87503]/20">
             <div>
               <span className="text-xs font-bold text-[#7A5726] block">
-                大学・高専を越えるプロジェクト共創プラットフォーム
+                夢を実現させる仲間を見つけよう。大学・高専を越えるプロジェクト共創プラットフォーム
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-[#3D2406] mt-0.5">
                 {activeNav === "home" && "ホーム（おすすめプロジェクト）"}

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HIVE",
-  description: "その夢を実現させる仲間を見つけよう。",
+  description: "夢を実現させる仲間を見つけよう。",
 };
 
 export default function RootLayout({
