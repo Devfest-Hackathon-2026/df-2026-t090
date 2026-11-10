@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { FILTER_FIELDS, FilterField } from "@/lib/constants";
 import { UserProfile, ProjectApplication, ProjectMessage, UserSkillBranch } from "@/lib/types/hive";
 import { ProjectTaskItem, TaskStatus } from "@/app/api/student/projects/[id]/tasks/route";
+import { ProjectFileItem } from "@/app/api/student/projects/[id]/files/route";
 import { formatJSTDateTime } from "@/lib/theme";
 import StudentSidebar from "@/components/StudentSidebar";
 import OnboardingModal from "@/components/OnboardingModal";
@@ -177,6 +178,13 @@ export default function Home() {
   const [isGeneratingGakuchika, setIsGeneratingGakuchika] = useState<boolean>(false);
   const [gakuchikaError, setGakuchikaError] = useState<string | null>(null);
   const [gakuchikaCopyMessage, setGakuchikaCopyMessage] = useState<string | null>(null);
+
+  // ──────── 共有ファイル管理用State ────────
+  const [projectFiles, setProjectFiles] = useState<ProjectFileItem[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
+  const [isUploadingFile, setIsUploadingFile] = useState<boolean>(false);
+  const [fileActionMessage, setFileActionMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ──────── 参加メンバー動的取得用State ────────
   const [projectMembers, setProjectMembers] = useState<ProjectMemberResponseItem[]>([]);
@@ -680,6 +688,116 @@ export default function Home() {
       }
     } catch {
       alert("タスク状態の更新に失敗しました。");
+    }
+  };
+
+  // ──────── 共有ファイル一覧の動的取得 ────────
+  const fetchFiles = useCallback(async () => {
+    if (!activeProjectId || !user) return;
+    setLoadingFiles(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/files`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProjectFiles(data.files || []);
+      }
+    } catch (err) {
+      console.error("ファイル取得エラー:", err);
+    } finally {
+      setLoadingFiles(false);
+    }
+  }, [activeProjectId, user]);
+
+  useEffect(() => {
+    if (!activeNav.startsWith("workspace") || !activeProjectId || !user) return;
+    let active = true;
+
+    const loadFiles = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/student/projects/${activeProjectId}/files`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setProjectFiles(data.files || []);
+        }
+      } catch (err) {
+        console.error("ファイル取得エラー:", err);
+      } finally {
+        if (active) setLoadingFiles(false);
+      }
+    };
+
+    loadFiles();
+    return () => {
+      active = false;
+    };
+  }, [activeNav, activeProjectId, user]);
+
+  // ──────── ファイルアップロード ────────
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeProjectId) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      alert("1ファイルの上限は20MBです。");
+      return;
+    }
+
+    setIsUploadingFile(true);
+    setFileActionMessage(null);
+
+    try {
+      const token = await user.getIdToken();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/student/projects/${activeProjectId}/files`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "アップロードに失敗しました。");
+        return;
+      }
+
+      setFileActionMessage(`✓ 「${data.fileName}」を Cloud Storage にアップロードしました！`);
+      fetchFiles();
+      setTimeout(() => setFileActionMessage(null), 3500);
+    } catch {
+      alert("通信エラーが発生しました。");
+    } finally {
+      setIsUploadingFile(false);
+      e.target.value = "";
+    }
+  };
+
+  // ──────── ファイルを期限付き署名付きURLで開く ────────
+  const handleOpenFile = async (fileId: string) => {
+    if (!user || !activeProjectId) {
+      alert("ファイルを閲覧するにはログインが必要です。");
+      return;
+    }
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/student/projects/${activeProjectId}/files?fileId=${fileId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      } else {
+        alert(data.error || "ファイルを開けませんでした。");
+      }
+    } catch {
+      alert("ファイル取得通信エラーが発生しました。");
     }
   };
 
@@ -2534,34 +2652,73 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 共有ファイルサブタブ */}
+              {/* 📁 共有ファイルサブタブ */}
               {currentSubTab === "files" && (
                 <div className="p-6 rounded-3xl bg-[#FFFBEB] border border-[#B87503]/30 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#3D2406]">共有ファイル一覧</span>
-                    <button
-                      type="button"
-                      onClick={() => alert("ファイルアップロード機能: 企画書やCADデータなどを追加できます。")}
-                      className="px-3.5 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold"
-                    >
-                      ＋ ファイルを共有
-                    </button>
+                    <div>
+                      <span className="font-bold text-xs sm:text-sm text-[#3D2406] block">共有ファイル一覧</span>
+                      <span className="text-[11px] text-[#7A5726]">
+                        Cloud Storage（東京リージョン）へ安全に保存されます（1ファイル20MBまで・期限付き署名付きURLで保護）。
+                      </span>
+                    </div>
+
+                    <div>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingFile}
+                        className="px-4 py-1.5 rounded-full bg-[#F5B301] text-[#3D2406] text-xs font-bold hover:bg-[#E0A200] shadow-xs disabled:opacity-50 cursor-pointer"
+                      >
+                        {isUploadingFile ? "アップロード中..." : "＋ ファイルを共有"}
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {[
-                      { name: "プロジェクト構想書_第1版.pdf", size: "1.2 MB", uploader: "田中 健太", time: "昨日" },
-                      { name: "試作ホップ配合データ.xlsx", size: "480 KB", uploader: "佐藤 澪", time: "2日前" },
-                      { name: "ラベルデザイン案_モック.fig", size: "3.4 MB", uploader: "鈴木 結愛", time: "3日前" },
-                    ].map((f, i) => (
-                      <div key={i} className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-[#3D2406] block">{f.name}</span>
-                          <span className="text-[10px] text-[#7A5726]">{f.size} • 投稿: {f.uploader}</span>
+
+                  {fileActionMessage && (
+                    <div className="p-3 rounded-xl bg-[#EDF7ED] border border-[#81C784] text-[#1E4620] text-xs font-bold">
+                      {fileActionMessage}
+                    </div>
+                  )}
+
+                  {loadingFiles ? (
+                    <div className="py-8 text-center text-xs text-[#7A5726] font-bold">
+                      ファイルを読み込み中...
+                    </div>
+                  ) : projectFiles.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 text-center text-xs text-[#7A5726] font-bold">
+                      共有ファイルはまだありません。右上の「＋ ファイルを共有」から企画書や設計図を共有しましょう！
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {projectFiles.map((f) => (
+                        <div
+                          key={f.id}
+                          className="p-3.5 rounded-2xl bg-[#FFFDF7] border border-[#B87503]/20 flex items-center justify-between shadow-xs"
+                        >
+                          <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
+                            <span className="font-bold text-[#3D2406] truncate block">{f.name}</span>
+                            <span className="text-[10px] text-[#7A5726]">
+                              {f.sizeFormatted} • 投稿: {f.uploaderName} • {formatJSTDateTime(f.createdAt)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFile(f.id)}
+                            className="px-3 py-1 rounded-full bg-[#FFF8E1] border border-[#B87503]/30 text-[#B87503] text-xs font-bold hover:bg-[#F5B301] transition-colors shrink-0 cursor-pointer"
+                          >
+                            📥 開く
+                          </button>
                         </div>
-                        <span className="text-xs text-[#B87503] font-bold">📥 開く</span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
